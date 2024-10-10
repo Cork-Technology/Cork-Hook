@@ -1,6 +1,7 @@
 pragma solidity ^0.8.0;
 
 library HookUtils {
+    
     // Get normalized time (t) as a value between 0 and 1
     function getNormalizedTime(uint256 startTime, uint256 maturityTime) public view returns (uint256 t) {
         uint256 elapsedTime = block.timestamp - startTime;
