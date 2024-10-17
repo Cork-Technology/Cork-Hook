@@ -17,6 +17,13 @@ function sort(address a, address b) pure returns (address, address) {
     return a < b ? (a, b) : (b, a);
 }
 
+function reverseSortWithAmount(address a, address b, address token0, address token1, uint256 amount0, uint256 amount1)
+    pure
+    returns (address, address, uint256, uint256)
+{
+    return a == token0 ? (token0, token1, amount0, amount1) : (token1, token0, amount1, amount0);
+}
+
 function sort(address a, address b, uint256 amountA, uint256 amountB)
     pure
     returns (address, address, uint256, uint256)
@@ -52,26 +59,40 @@ library PoolStateLibrary {
         return state.token0 != address(0);
     }
 
-    function addLiquidity(PoolState storage state, uint256 amount0, uint256 amount1, address sender)
+    function tryAddLiquidity(PoolState storage state, uint256 amount0, uint256 amount1)
         internal
         returns (uint256 reserve0, uint256 reserve1, uint256 mintedLp)
     {
         (reserve0, reserve1, mintedLp) = LiquidityMath.addLiquidity(
             state.reserve0, state.reserve1, state.liquidityToken.totalSupply(), amount0, amount1
         );
+    }
+
+    function addLiquidity(PoolState storage state, uint256 amount0, uint256 amount1, address sender)
+        internal
+        returns (uint256 reserve0, uint256 reserve1, uint256 mintedLp)
+    {
+        (reserve0, reserve1, mintedLp) = tryAddLiquidity(state, amount0, amount1);
 
         state.reserve0 = reserve0;
         state.reserve1 = reserve1;
         state.liquidityToken.mint(sender, mintedLp);
     }
 
-    function removeLiquidity(PoolState storage state, uint256 liquidityAmount, address sender)
+    function tryRemoveLiquidity(PoolState storage state, uint256 liquidityAmount)
         internal
         returns (uint256 amount0, uint256 amount1, uint256 reserve0, uint256 reserve1)
     {
         (amount0, amount1, reserve0, reserve1) = LiquidityMath.removeLiquidity(
             state.reserve0, state.reserve1, state.liquidityToken.totalSupply(), liquidityAmount
         );
+    }
+
+    function removeLiquidity(PoolState storage state, uint256 liquidityAmount, address sender)
+        internal
+        returns (uint256 amount0, uint256 amount1, uint256 reserve0, uint256 reserve1)
+    {
+        (amount0, amount1, reserve0, reserve1) = tryRemoveLiquidity(state, liquidityAmount);
 
         state.reserve0 = reserve0;
         state.reserve1 = reserve1;
