@@ -16,7 +16,6 @@ import "openzeppelin-contracts/contracts/utils/Strings.sol";
 import "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
 import "./lib/Calls.sol";
 
-// abstract for now
 contract CorkHook is BaseHook {
     using Clones for address;
     using PoolStateLibrary for PoolState;
@@ -67,12 +66,7 @@ contract CorkHook is BaseHook {
         revert DisableNativeLiquidityModification();
     }
 
-    function beforeInitialize(address sender, PoolKey calldata key, uint160 __unusedSqrtPrice)
-        external
-        virtual
-        override
-        returns (bytes4)
-    {
+    function beforeInitialize(address, PoolKey calldata key, uint160) external virtual override returns (bytes4) {
         address token0 = Currency.unwrap(key.currency0);
         address token1 = Currency.unwrap(key.currency1);
 
