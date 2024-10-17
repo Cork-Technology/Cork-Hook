@@ -15,6 +15,7 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 import "openzeppelin-contracts/contracts/utils/Strings.sol";
 import "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
 import "./lib/Calls.sol";
+import "forge-std/console.sol";
 
 contract CorkHook is BaseHook {
     using Clones for address;
@@ -83,6 +84,8 @@ contract CorkHook is BaseHook {
             string.concat(Strings.toHexString(uint160(token0)), Strings.toHexString(uint160(token1)));
 
         lp.initialize(string.concat("Liquidity Token ", identifier), string.concat("LP", identifier), address(this));
+
+        return this.beforeInitialize.selector;
     }
 
     function _addLiquidity(PoolState storage self, uint256 amount0, uint256 amount1, address sender) internal {
@@ -156,7 +159,14 @@ contract CorkHook is BaseHook {
     }
 
     function _unlockCallback(bytes calldata data) internal virtual override returns (bytes memory) {
-        (Action action,) = abi.decode(data, (Action, bytes));
+        bytes memory rawAction ;
+        assembly {
+            mstore(add(rawAction, 0), data)
+        }
+        console.logBytes(rawAction);
+        console.logBytes(data);
+
+        Action action = abi.decode(rawAction, (Action));
 
         if (action == Action.AddLiquidity) {
             (, AddLiquidtyParams memory params) = abi.decode(data, (Action, AddLiquidtyParams));
@@ -173,5 +183,9 @@ contract CorkHook is BaseHook {
             // TODO : find out what the return value should be used for
             return "";
         }
+    }
+
+    function getLiquidityToken(address ra, address ct) external view returns (address) {
+        return address(pool[toAmmId(ra, ct)].liquidityToken);
     }
 }

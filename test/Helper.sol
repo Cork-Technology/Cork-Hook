@@ -11,12 +11,13 @@ import {Deployers} from "v4-periphery/lib/v4-core/test/utils/Deployers.sol";
 import "forge-std/mocks/MockERC20.sol";
 import "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
 import {CorkHook, LiquidityToken, AmmId, PoolState} from "./../src/CorkHook.sol";
+import {TestCorkHook} from "./TestCorkHook.sol";
 
 contract TestHelper is Test, Deployers {
     IPoolManager poolManager;
 
-    MockERC20 token0;
-    MockERC20 token1;
+    DummyErc20 token0;
+    DummyErc20 token1;
 
     LiquidityToken lpBase;
     TestCorkHook hook;
@@ -26,12 +27,14 @@ contract TestHelper is Test, Deployers {
             | Hooks.BEFORE_SWAP_FLAG
     );
 
-    function setup() public {
+    address DEFAULT_ADDRESS = address(69);
+
+    function setupTest() public {
         deployFreshManagerAndRouters();
 
         poolManager = IPoolManager(manager);
-        token0 = new MockERC20();
-        token1 = new MockERC20();
+        token0 = new DummyErc20();
+        token1 = new DummyErc20();
 
         token0.initialize("Token0", "TK0", 18);
         token1.initialize("Token1", "TK1", 18);
@@ -42,25 +45,30 @@ contract TestHelper is Test, Deployers {
         }
 
         lpBase = new LiquidityToken();
-        deployCodeTo("CorkHook.sol", abi.encode(poolManager, lpBase), address(flags));
+
+        deployCodeTo("TestCorkHook.sol", abi.encode(poolManager, lpBase), address(flags));
         
-        // etch code with getters
-        vm.etch(address(flags), type(TestCorkHook).creationCode);
+        hook = TestCorkHook(address(flags));
     }
 
     function setupWithInitializedPool() public {
-        setup();
+        setupTest();
+        withInitializedPool();
+    }
 
-        PoolKey memory key = PoolKey(Currency.wrap(address(token0)), Currency.wrap(address(token1)), 0, 0, IHooks(hook));
+    function withInitializedPool() public {
+        PoolKey memory key = PoolKey(Currency.wrap(address(token0)), Currency.wrap(address(token1)), 0, 1, IHooks(hook));
 
-        poolManager.initialize(key, 0);
+        poolManager.initialize(key, SQRT_PRICE_1_1);
     }
 }
 
-contract TestCorkHook is CorkHook {
-    constructor(IPoolManager _poolManager, LiquidityToken _lpBase) CorkHook(_poolManager, _lpBase) {}
+contract DummyErc20 is MockERC20 {
+    function mint(address to, uint256 amount) public {
+        _mint(to, amount);
+    }
 
-    function getPoolState(AmmId ammId) public view returns (PoolState memory) {
-        return pool[ammId];
+    function burn(address from, uint256 amount) public {
+        _burn(from, amount);
     }
 }
