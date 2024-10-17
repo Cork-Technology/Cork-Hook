@@ -17,6 +17,7 @@ import "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
 import "./lib/Calls.sol";
 import "forge-std/console.sol";
 
+// TODO : create interface, events, and move errors
 contract CorkHook is BaseHook {
     using Clones for address;
     using PoolStateLibrary for PoolState;
@@ -118,10 +119,14 @@ contract CorkHook is BaseHook {
         token1.take(poolManager, sender, amount1, false);
     }
 
-    function addLiquidity(address ra, address ct, uint256 raAmount, uint256 ctAmount) external {
+    function addLiquidity(address ra, address ct, uint256 raAmount, uint256 ctAmount)
+        external
+        returns (uint256 mintedLp)
+    {
         (address token0, address token1, uint256 amount0, uint256 amount1) = sort(ra, ct, raAmount, ctAmount);
 
         // all sanitiy check should go here
+        // TODO : maybe add more sanity checks
 
         // check if pool is initialized
         AmmId ammId = toAmmId(token0, token1);
@@ -130,6 +135,9 @@ contract CorkHook is BaseHook {
         if (!self.isInitialized()) {
             revert NotInitialized();
         }
+
+        // retruns how much liquidity token was minted
+        (,, mintedLp) = pool[toAmmId(token0, token1)].tryAddLiquidity(amount0, amount1);
 
         AddLiquidtyParams memory params = AddLiquidtyParams(token0, amount0, token1, amount1, msg.sender);
 
@@ -138,10 +146,14 @@ contract CorkHook is BaseHook {
         poolManager.unlock(data);
     }
 
-    function removeLiquidity(address ra, address ct, uint256 liquidityAmount) external {
+    function removeLiquidity(address ra, address ct, uint256 liquidityAmount)
+        external
+        returns (uint256 amountRa, uint256 amountCt)
+    {
         (address token0, address token1) = sort(ra, ct);
 
         // all sanitiy check should go here
+        // TODO : maybe add more sanity checks
 
         // check if pool is initialized
         AmmId ammId = toAmmId(token0, token1);
@@ -150,6 +162,9 @@ contract CorkHook is BaseHook {
         if (!self.isInitialized()) {
             revert NotInitialized();
         }
+
+        (uint256 amount0, uint256 amount1,,) = pool[toAmmId(token0, token1)].tryRemoveLiquidity(liquidityAmount);
+        (,, amountRa, amountCt) = reverseSortWithAmount(ra, ct, token0, token1, amount0, amount1);
 
         RemoveLiquidtyParams memory params = RemoveLiquidtyParams(token0, token1, liquidityAmount, msg.sender);
 
@@ -159,14 +174,7 @@ contract CorkHook is BaseHook {
     }
 
     function _unlockCallback(bytes calldata data) internal virtual override returns (bytes memory) {
-        bytes memory rawAction ;
-        assembly {
-            mstore(add(rawAction, 0), data)
-        }
-        console.logBytes(rawAction);
-        console.logBytes(data);
-
-        Action action = abi.decode(rawAction, (Action));
+        Action action = abi.decode(data, (Action));
 
         if (action == Action.AddLiquidity) {
             (, AddLiquidtyParams memory params) = abi.decode(data, (Action, AddLiquidtyParams));
