@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+import "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 library LiquidityMath {
     // Adding Liquidity (Pure Function)
@@ -13,8 +14,8 @@ library LiquidityMath {
         internal
         pure
         returns (
-            uint256 newReserveRA, // Updated reserve of RA
-            uint256 newReserveCT, // Updated reserve of CT
+            uint256 newReserve0, // Updated reserve of RA
+            uint256 newReserve1, // Updated reserve of CT
             uint256 liquidityMinted // Amount of liquidity tokens minted
         )
     {
@@ -24,17 +25,17 @@ library LiquidityMath {
         // Calculate the liquidity tokens minted based on the added amounts and the current reserves
         if (totalLiquidity == 0) {
             // Initial liquidity provision (sqrt of product of amounts added)
-            liquidityMinted = sqrt(amount0 * amount1);
+            liquidityMinted = Math.sqrt(amount0 * amount1);
         } else {
             // Mint liquidity proportional to the added amounts
             liquidityMinted = (amount0 * totalLiquidity) / reserve0;
         }
 
         // Update reserves
-        newReserveRA = reserve0 + amount0;
-        newReserveCT = reserve1 + amount1;
+        newReserve0 = reserve0 + amount0;
+        newReserve1 = reserve1 + amount1;
 
-        return (newReserveRA, newReserveCT, liquidityMinted);
+        return (newReserve0, newReserve1, liquidityMinted);
     }
 
     // Removing Liquidity (Pure Function)
@@ -49,8 +50,8 @@ library LiquidityMath {
         returns (
             uint256 amount0, // Amount of RA returned to the LP
             uint256 amount1, // Amount of CT returned to the LP
-            uint256 newReserveRA, // Updated reserve of RA
-            uint256 newReserveCT // Updated reserve of CT
+            uint256 newReserve0, // Updated reserve of RA
+            uint256 newReserve1 // Updated reserve of CT
         )
     {
         require(liquidityAmount > 0, "Invalid liquidity amount");
@@ -61,20 +62,10 @@ library LiquidityMath {
         amount1 = (liquidityAmount * reserve1) / totalLiquidity;
 
         // Update reserves after removing liquidity
-        newReserveRA = reserve0 - amount0;
-        newReserveCT = reserve1 - amount1;
+        newReserve0 = reserve0 - amount0;
+        newReserve1 = reserve1 - amount1;
 
-        return (amount0, amount1, newReserveRA, newReserveCT);
+        return (amount0, amount1, newReserve0, newReserve1);
     }
 
-    // Helper function to calculate square root
-    function sqrt(uint256 x) internal pure returns (uint256) {
-        uint256 z = (x + 1) / 2;
-        uint256 y = x;
-        while (z < y) {
-            y = z;
-            z = (x / z + z) / 2;
-        }
-        return y;
-    }
 }
