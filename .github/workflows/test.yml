@@ -1,34 +1,30 @@
-name: test
-
-on: workflow_dispatch
-
-env:
-  FOUNDRY_PROFILE: ci
+name: unit test
+on:
+  pull_request:
+    types:
+      - synchronize
+      - opened
+      - edited
+    branches:
+      - main
+  push:
+    paths:
+      - "src/**"
+      - "test/**"
 
 jobs:
-  check:
-    strategy:
-      fail-fast: true
-
-    name: Foundry project
+  forge-test:
     runs-on: ubuntu-latest
+    name: Forge unit test
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
 
-      - name: Run Forge build
-        run: |
-          forge --version
-          forge build --sizes
-        id: build
+      - name: Run tests
+        run: forge test -vvv
 
-      - name: Run Forge tests
-        run: |
-          forge test -vvv
-        id: test
+      - name: Run snapshot
+        run: forge snapshot
