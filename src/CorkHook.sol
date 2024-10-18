@@ -40,6 +40,16 @@ contract CorkHook is BaseHook {
         lpBase = address(_lpBase);
     }
 
+    modifier onlyInitialized(address a, address b) {
+        AmmId ammId = toAmmId(a, b);
+        PoolState storage self = pool[ammId];
+
+        if (!self.isInitialized()) {
+            revert NotInitialized();
+        }
+        _;
+    }
+
     function getHookPermissions() public pure virtual override returns (Hooks.Permissions memory) {
         return Hooks.Permissions({
             beforeInitialize: true, // deploy lp tokens for this pool
@@ -121,20 +131,13 @@ contract CorkHook is BaseHook {
 
     function addLiquidity(address ra, address ct, uint256 raAmount, uint256 ctAmount)
         external
+        onlyInitialized(ra, ct)
         returns (uint256 mintedLp)
     {
         (address token0, address token1, uint256 amount0, uint256 amount1) = sort(ra, ct, raAmount, ctAmount);
 
         // all sanitiy check should go here
         // TODO : maybe add more sanity checks
-
-        // check if pool is initialized
-        AmmId ammId = toAmmId(token0, token1);
-        PoolState storage self = pool[ammId];
-
-        if (!self.isInitialized()) {
-            revert NotInitialized();
-        }
 
         // retruns how much liquidity token was minted
         (,, mintedLp) = pool[toAmmId(token0, token1)].tryAddLiquidity(amount0, amount1);
@@ -148,6 +151,7 @@ contract CorkHook is BaseHook {
 
     function removeLiquidity(address ra, address ct, uint256 liquidityAmount)
         external
+        onlyInitialized(ra, ct)
         returns (uint256 amountRa, uint256 amountCt)
     {
         (address token0, address token1) = sort(ra, ct);
@@ -191,9 +195,15 @@ contract CorkHook is BaseHook {
             // TODO : find out what the return value should be used for
             return "";
         }
+
+        return "";
     }
 
-    function getLiquidityToken(address ra, address ct) external view returns (address) {
+    function getLiquidityToken(address ra, address ct) external view onlyInitialized(ra, ct) returns (address) {
         return address(pool[toAmmId(ra, ct)].liquidityToken);
+    }
+
+    function getReserves(address ra, address ct) external view onlyInitialized(ra, ct) returns (uint256, uint256) {
+        return (pool[toAmmId(ra, ct)].reserve0, pool[toAmmId(ra, ct)].reserve1);
     }
 }
