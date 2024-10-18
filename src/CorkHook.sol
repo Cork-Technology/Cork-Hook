@@ -91,10 +91,12 @@ contract CorkHook is BaseHook {
         LiquidityToken lp = LiquidityToken(lpBase.clone());
         pool[ammId].initialize(token0, token1, address(lp));
 
+        // the reason we just concatenate the addresses instead of their respective symbols is that because this way, we don't need to worry about
+        // tokens symbols to have different encoding and other shinanigans. Frontend should parse and display the token symbols accordingly 
         string memory identifier =
-            string.concat(Strings.toHexString(uint160(token0)), Strings.toHexString(uint160(token1)));
+            string.concat(Strings.toHexString(uint160(token0)), "-", Strings.toHexString(uint160(token1)));
 
-        lp.initialize(string.concat("Liquidity Token ", identifier), string.concat("LP", identifier), address(this));
+        lp.initialize(string.concat("Liquidity Token ", identifier), string.concat("LP-", identifier), address(this));
 
         return this.beforeInitialize.selector;
     }
