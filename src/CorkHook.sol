@@ -18,6 +18,7 @@ import "./lib/Calls.sol";
 import "forge-std/console.sol";
 
 // TODO : create interface, events, and move errors
+// TODO : use id instead of tokens address
 contract CorkHook is BaseHook {
     using Clones for address;
     using PoolStateLibrary for PoolState;
@@ -48,6 +49,14 @@ contract CorkHook is BaseHook {
             revert NotInitialized();
         }
         _;
+    }
+
+    // TODO : placeholder 
+    function swap() internal{
+        // we calculate how much they must pay
+        // we transfer their tokens
+        // we call their callback if they specify(they should approve us to spend their tokens equals to how much they must pay)
+        // we transfer user tokens to the pool equal to how much they must pay
     }
 
     function getHookPermissions() public pure virtual override returns (Hooks.Permissions memory) {
