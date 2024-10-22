@@ -16,9 +16,13 @@ import "openzeppelin-contracts/contracts/utils/Strings.sol";
 import "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
 import "./lib/Calls.sol";
 import "forge-std/console.sol";
+import "./lib/SwapMath.sol";
+import "./interfaces/CorkAsset.sol";
+import "./interfaces/CorkSwapCallback.sol";
 
 // TODO : create interface, events, and move errors
 // TODO : use id instead of tokens address
+// TOD : refactor and move some to state.sol
 contract CorkHook is BaseHook {
     using Clones for address;
     using PoolStateLibrary for PoolState;
@@ -49,19 +53,6 @@ contract CorkHook is BaseHook {
             revert NotInitialized();
         }
         _;
-    }
-
-    function beforeSwap(address, PoolKey calldata, IPoolManager.SwapParams calldata, bytes calldata)
-        external
-        virtual
-        override
-        returns (bytes4, BeforeSwapDelta, uint24)
-    {
-        // we calculate how much they must pay
-        // we transfer their tokens
-        // we call their callback if they specify(they should approve us to spend their tokens equals to how much they must pay)
-        // we transfer user tokens to the pool equal to how much they must pay
-        return this.beforeSwap.selector;
     }
 
     function getHookPermissions() public pure virtual override returns (Hooks.Permissions memory) {
@@ -221,5 +212,167 @@ contract CorkHook is BaseHook {
 
     function getReserves(address ra, address ct) external view onlyInitialized(ra, ct) returns (uint256, uint256) {
         return (pool[toAmmId(ra, ct)].reserve0, pool[toAmmId(ra, ct)].reserve1);
+    }
+
+    function beforeSwap(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.SwapParams calldata params,
+        bytes calldata hookData
+    )
+        external
+        override
+        onlyInitialized(Currency.unwrap(key.currency0), Currency.unwrap(key.currency1))
+        returns (bytes4, BeforeSwapDelta, uint24)
+    {
+        {
+            PoolState storage self = pool[toAmmId(Currency.unwrap(key.currency0), Currency.unwrap(key.currency1))];
+            // _beforeSwap(self, params.amountSpecified, params.zeroForOne, hookData, sender);
+        }
+        // we calculate how much they must pay
+        // we transfer their tokens
+        // we call their callback if they specify(they should approve us to spend their tokens equals to how much they must pay)
+        // we transfer user tokens to the pool equal to how much they must pay
+    }
+
+    function _beforeSwap(
+        PoolState storage self,
+        int256 amountSpecified,
+        bool zeroForOne,
+        bytes calldata hookData,
+        address sender
+    ) internal {
+        bool exactIn = (amountSpecified < 0);
+        uint256 amountIn;
+        uint256 amountOut;
+
+        if (exactIn) {
+            amountIn = uint256(-amountSpecified);
+            amountOut = _getAmountOut(self, zeroForOne, amountIn);
+        } else {
+            amountOut = uint256(amountSpecified);
+            amountIn = _getAmountIn(self, zeroForOne, amountOut);
+            (zeroForOne, amountOut);
+        }
+
+        (Currency input, Currency output) = _getInputOutput(self, zeroForOne);
+
+        (uint256 kBefore,) = _k(self);
+
+        // update reserve
+        self.updateReserves(Currency.unwrap(output), amountOut, true);
+
+        // we transfer their tokens
+        output.settle(poolManager, address(this), amountOut, true);
+        output.take(poolManager, sender, amountOut, false);
+
+        // there is data, means flash swap
+        if (hookData.length > 0) {
+            // infer what token would be used for payment, if counter is true, then the input token is used for payment, otherwise its the output token
+            bool counter = abi.decode(hookData, (bool));
+            // we expect user to use exact output swap when dealing with flash swap
+            // so we use amountOut as the payment amount cause they simply have to return the borrowed amount
+            // or it's the in amount that they have to pay with the other token
+            uint256 paymentAmount = counter ? amountIn : amountOut;
+
+            // call the callback
+            // TODO : maybe pass the payment token instead?
+            CorkSwapCallback(sender).CorkCall(sender, hookData, paymentAmount, counter);
+
+            // process repayments
+            if (counter) {
+                // update reserve
+                self.updateReserves(Currency.unwrap(input), amountIn, false);
+
+                input.settle(poolManager, sender, amountIn, true);
+                input.take(poolManager, address(this), amountIn, false);
+            } else {
+                // update reserve
+                self.updateReserves(Currency.unwrap(output), amountOut, false);
+
+                output.settle(poolManager, sender, amountOut, true);
+                output.take(poolManager, address(this), amountOut, false);
+            }
+
+            // no data, means normal swap
+        } else {
+            // update reserve
+            self.updateReserves(Currency.unwrap(input), amountIn, false);
+
+            // settle swap
+            input.settle(poolManager, sender, amountIn, true);
+            input.take(poolManager, address(this), amountIn, false);
+        }
+
+        (uint256 kAfter,) = _k(self);
+
+        // ensure k isn't less than before
+        require(kAfter >= kBefore, "K_DECREASED");
+    }
+
+    function _getAmountIn(PoolState storage self, bool zeroForOne, uint256 amountOut)
+        internal
+        view
+        returns (uint256 amountIn)
+    {
+        require(amountOut > 0, "INSUFFICIENT_OUTPUT_AMOUNT");
+
+        (uint256 reserveIn, uint256 reserveOut) =
+            zeroForOne ? (self.reserve0, self.reserve1) : (self.reserve1, self.reserve0);
+        require(reserveIn > 0 && reserveOut > 0, "INSUFFICIENT_LIQUIDITY");
+
+        (uint256 invariant, uint256 oneMinusT) = _k(self);
+        amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, invariant, oneMinusT);
+    }
+
+    function _getAmountOut(PoolState storage self, bool zeroForOne, uint256 amountIn)
+        internal
+        view
+        returns (uint256 amountOut)
+    {
+        require(amountIn > 0, "INSUFFICIENT_INPUT_AMOUNT");
+
+        (uint256 reserveIn, uint256 reserveOut) =
+            zeroForOne ? (self.reserve0, self.reserve1) : (self.reserve1, self.reserve0);
+        require(reserveIn > 0 && reserveOut > 0, "INSUFFICIENT_LIQUIDITY");
+
+        (uint256 invariant, uint256 oneMinusT) = _k(self);
+        amountOut = SwapMath.getAmountOut(amountIn, reserveIn, reserveOut, invariant, oneMinusT);
+    }
+
+    function _getInputOutput(PoolState storage self, bool zeroForOne)
+        internal
+        view
+        returns (Currency input, Currency output)
+    {
+        (address _input, address _output) = zeroForOne ? (self.token0, self.token1) : (self.token1, self.token0);
+        return (Currency.wrap(_input), Currency.wrap(_output));
+    }
+
+    function _getIssuedAndMaturationTime(PoolState storage self) internal view returns (uint256 start, uint256 end) {
+        IExpiry token0 = IExpiry(self.token0);
+        IExpiry token1 = IExpiry(self.token1);
+
+        try token0.issuedAt() returns (uint256 issuedAt0) {
+            start = issuedAt0;
+            end = token0.expiry();
+            return (start, end);
+        } catch {}
+
+        try token1.issuedAt() returns (uint256 issuedAt1) {
+            start = issuedAt1;
+            end = token1.expiry();
+            return (start, end);
+        } catch {}
+
+        revert("Invalid Token Pairs, no expiry found");
+    }
+
+    function _k(PoolState storage self) internal view returns (uint256 invariant, uint256 oneMinusT) {
+        (uint256 reserve0, uint256 reserve1) = (self.reserve0, self.reserve1);
+        (uint256 start, uint256 end) = _getIssuedAndMaturationTime(self);
+
+        invariant = SwapMath.getInvariant(reserve0, reserve1, start, end);
+        oneMinusT = SwapMath.oneMinusT(start, end);
     }
 }

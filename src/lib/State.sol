@@ -13,6 +13,12 @@ function toAmmId(address ra, address ct) pure returns (AmmId) {
     return AmmId.wrap(keccak256(abi.encodePacked(token0, token1)));
 }
 
+function toAmmId(Currency _ra, Currency _ct) pure returns (AmmId) {
+    (address ra, address ct) = (Currency.unwrap(_ra), Currency.unwrap(_ct));
+
+    return toAmmId(ra, ct);
+}
+
 function sort(address a, address b) pure returns (address, address) {
     return a < b ? (a, b) : (b, a);
 }
@@ -41,6 +47,17 @@ struct PoolState {
 }
 
 library PoolStateLibrary {
+    function updateReserves(PoolState storage state, address token, uint256 amount, bool minus) internal {
+        if (token == state.token0) {
+            state.reserve0 = minus ? state.reserve0 - amount : state.reserve0 + amount;
+        } else if (token == state.token1) {
+            state.reserve1 = minus ? state.reserve1 - amount : state.reserve1 + amount;
+        } else {
+            // TODO : move to interface
+            revert("Token not in pool");
+        }
+    }
+
     function getToken0(PoolState storage state) internal view returns (Currency) {
         return Currency.wrap(state.token0);
     }
