@@ -1,4 +1,4 @@
-pragma solidity ^0.8.0;
+pragma solidity 0.8.26;
 
 library HookUtils {
     // Get normalized time (t) as a value between 0 and 1
@@ -13,7 +13,11 @@ library HookUtils {
     }
 
     // Helper function to calculate k = x^(1-t) + y^(1-t)
-    function getInvariant(uint256 raReserve, uint256 ctReserve, uint256 startTime, uint256 maturityTime) public view returns (uint256 k) {
+    function getInvariant(uint256 raReserve, uint256 ctReserve, uint256 startTime, uint256 maturityTime)
+        public
+        view
+        returns (uint256 k)
+    {
         uint256 t = getNormalizedTime(startTime, maturityTime);
 
         // Calculate (1 - t) as a percentage in 18 decimals

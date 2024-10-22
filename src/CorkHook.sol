@@ -1,88 +1,209 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.26;
 
-// TODO: update to v4-periphery/BaseHook.sol when its compatible
-
-import {IERC20} from "forge-std/interfaces/IERC20.sol";
+// TODO : refactor named imports
+import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {Strings} from "openzeppelin-contracts/contracts/utils/Strings.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
-import {IPoolManager} from "@uniswap/v4-core/contracts/interfaces/IPoolManager.sol";
-import {PoolKey} from "@uniswap/v4-core/contracts/types/PoolKey.sol";
-import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/contracts/types/PoolId.sol";
-import {BalanceDelta} from "@uniswap/v4-core/contracts/types/BalanceDelta.sol";
-import {Currency, CurrencyLibrary} from "@uniswap/v4-core/contracts/types/Currency.sol";
-import {BaseHook} from "v4-periphery/BaseHook.sol";
+import {IPoolManager} from "v4-periphery/lib/v4-core/src/interfaces/IPoolManager.sol";
+import {PoolKey} from "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
+import {PoolIdLibrary} from "v4-periphery/lib/v4-core/src/types/PoolId.sol";
+import {Currency} from "v4-periphery/lib/v4-core/src/types/Currency.sol";
+import {BaseHook} from "v4-periphery/src/base/hooks/BaseHook.sol";
+import {CurrencySettler} from "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
+import {LiquidityToken} from "./LiquidityToken.sol";
+import {Action, AddLiquidtyParams, RemoveLiquidtyParams} from "./lib/Calls.sol";
+import "./lib/State.sol";
 
+// TODO : create interface, events, and move errors
 contract CorkHook is BaseHook {
-    using CurrencyLibrary for Currency;
+    using Clones for address;
+    using PoolStateLibrary for PoolState;
     using PoolIdLibrary for PoolKey;
+    using CurrencySettler for Currency;
 
-    constructor(IPoolManager _poolManager) BaseHook(_poolManager) {}
+    error DisableNativeLiquidityModification();
 
-    function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
+    error AlreadyInitialized();
+
+    error NotInitialized();
+
+    /// @notice Pool state
+    mapping(AmmId => PoolState) internal pool;
+
+    // we will deploy proxy to this address for each pool
+    address lpBase;
+
+    constructor(IPoolManager _poolManager, LiquidityToken _lpBase) BaseHook(_poolManager) {
+        lpBase = address(_lpBase);
+    }
+
+    modifier onlyInitialized(address a, address b) {
+        AmmId ammId = toAmmId(a, b);
+        PoolState storage self = pool[ammId];
+
+        if (!self.isInitialized()) {
+            revert NotInitialized();
+        }
+        _;
+    }
+
+    function getHookPermissions() public pure virtual override returns (Hooks.Permissions memory) {
         return Hooks.Permissions({
-            beforeInitialize: false,
+            beforeInitialize: true, // deploy lp tokens for this pool
             afterInitialize: false,
-            beforeModifyPosition: true, // prevent v4 liquidity from being added
-            afterModifyPosition: false,
-            beforeSwap: true,
+            beforeAddLiquidity: true, // override, only allow adding liquidity from the hook
+            afterAddLiquidity: false,
+            beforeRemoveLiquidity: true, // override, only allow removing liquidity from the hook
+            afterRemoveLiquidity: false,
+            beforeSwap: true, // override, use our price curve
             afterSwap: false,
             beforeDonate: false,
             afterDonate: false,
-            noOp: true, // no-op PoolManager.swap in favor of constant sum curve
-            accessLock: true
+            beforeSwapReturnDelta: false,
+            afterSwapReturnDelta: false,
+            afterAddLiquidityReturnDelta: false,
+            afterRemoveLiquidityReturnDelta: false
         });
     }
 
-    /// @notice Constant sum swap via custom accounting, tokens are exchanged 1:1
-    function beforeSwap(address, PoolKey calldata key, IPoolManager.SwapParams calldata params, bytes calldata)
+    function beforeAddLiquidity(address, PoolKey calldata, IPoolManager.ModifyLiquidityParams calldata, bytes calldata)
         external
+        virtual
         override
         returns (bytes4)
     {
-        // tokens are always swapped 1:1, so inbound/outbound amounts are the same even if the user uses exact-output-swap
-        uint256 tokenAmount =
-            params.amountSpecified < 0 ? uint256(-params.amountSpecified) : uint256(params.amountSpecified);
-
-        // determine inbound/outbound token based on 0->1 or 1->0 swap
-        (Currency inbound, Currency outbound) =
-            params.zeroForOne ? (key.currency0, key.currency1) : (key.currency1, key.currency0);
-
-        // take the inbound token from the PoolManager, debt is paid by the swapper via the swap router
-        // (inbound token is added to hook's reserves)
-        poolManager.take(inbound, address(this), tokenAmount);
-
-        // provide outbound token to the PoolManager, credit is claimed by the swap router who forwards it to the swapper
-        // (outbound token is removed from hook's reserves)
-        outbound.transfer(address(poolManager), tokenAmount);
-        poolManager.settle(outbound);
-
-        // prevent normal v4 swap logic from executing
-        return Hooks.NO_OP_SELECTOR;
+        revert DisableNativeLiquidityModification();
     }
 
-    /// @notice No liquidity will be managed by v4 PoolManager
-    function beforeModifyPosition(
-        address,
-        PoolKey calldata key,
-        IPoolManager.ModifyPositionParams calldata,
-        bytes calldata
-    ) external override returns (bytes4) {
-        revert("No v4 Liquidity allowed");
+    function beforeInitialize(address, PoolKey calldata key, uint160) external virtual override returns (bytes4) {
+        address token0 = Currency.unwrap(key.currency0);
+        address token1 = Currency.unwrap(key.currency1);
+
+        AmmId ammId = toAmmId(token0, token1);
+
+        if (pool[ammId].isInitialized()) {
+            revert AlreadyInitialized();
+        }
+
+        LiquidityToken lp = LiquidityToken(lpBase.clone());
+        pool[ammId].initialize(token0, token1, address(lp));
+
+        // the reason we just concatenate the addresses instead of their respective symbols is that because this way, we don't need to worry about
+        // tokens symbols to have different encoding and other shinanigans. Frontend should parse and display the token symbols accordingly
+        string memory identifier =
+            string.concat(Strings.toHexString(uint160(token0)), "-", Strings.toHexString(uint160(token1)));
+
+        lp.initialize(string.concat("Liquidity Token ", identifier), string.concat("LP-", identifier), address(this));
+
+        return this.beforeInitialize.selector;
     }
 
-    // -----------------------------------------------
-    // Liquidity Functions, not production ready
-    // -----------------------------------------------
-    /// @notice Add liquidity 1:1 for the constant sum curve
-    /// @param key PoolKey of the pool to add liquidity to
-    /// @param liquiditySum The sum of the liquidity to add (token0 + token1)
-    function addLiquidity(PoolKey calldata key, uint256 liquiditySum) external {
-        require(liquiditySum % 2 == 0, "liquiditySum must be even");
-        uint256 tokenAmounts = liquiditySum / 2;
+    function _addLiquidity(PoolState storage self, uint256 amount0, uint256 amount1, address sender) internal {
+        self.addLiquidity(amount0, amount1, sender);
 
-        IERC20(Currency.unwrap(key.currency0)).transferFrom(msg.sender, address(this), tokenAmounts);
-        IERC20(Currency.unwrap(key.currency1)).transferFrom(msg.sender, address(this), tokenAmounts);
+        Currency token0 = self.getToken0();
+        Currency token1 = self.getToken1();
 
-        // TODO: should mint a receipt token to msg.sender
+        // settle claims token
+        token0.settle(poolManager, sender, amount0, false);
+        token1.settle(poolManager, sender, amount1, false);
+
+        // take the tokens
+        token0.take(poolManager, address(this), amount0, true);
+        token1.take(poolManager, address(this), amount1, true);
+    }
+
+    function _removeLiquidity(PoolState storage self, uint256 liquidityAmount, address sender) internal {
+        (uint256 amount0, uint256 amount1,,) = self.removeLiquidity(liquidityAmount, sender);
+
+        Currency token0 = self.getToken0();
+        Currency token1 = self.getToken1();
+
+        // burn claims token
+        token0.settle(poolManager, address(this), amount0, true);
+        token1.settle(poolManager, address(this), amount1, true);
+
+        // send back the tokens
+        token0.take(poolManager, sender, amount0, false);
+        token1.take(poolManager, sender, amount1, false);
+    }
+
+    function addLiquidity(address ra, address ct, uint256 raAmount, uint256 ctAmount)
+        external
+        onlyInitialized(ra, ct)
+        returns (uint256 mintedLp)
+    {
+        (address token0, address token1, uint256 amount0, uint256 amount1) = sort(ra, ct, raAmount, ctAmount);
+
+        // all sanitiy check should go here
+        // TODO : maybe add more sanity checks
+
+        // retruns how much liquidity token was minted
+        (,, mintedLp) = pool[toAmmId(token0, token1)].tryAddLiquidity(amount0, amount1);
+
+        AddLiquidtyParams memory params = AddLiquidtyParams(token0, amount0, token1, amount1, msg.sender);
+
+        bytes memory data = abi.encode(Action.AddLiquidity, params);
+
+        poolManager.unlock(data);
+    }
+
+    function removeLiquidity(address ra, address ct, uint256 liquidityAmount)
+        external
+        onlyInitialized(ra, ct)
+        returns (uint256 amountRa, uint256 amountCt)
+    {
+        (address token0, address token1) = sort(ra, ct);
+
+        // all sanitiy check should go here
+        // TODO : maybe add more sanity checks
+
+        // check if pool is initialized
+        AmmId ammId = toAmmId(token0, token1);
+        PoolState storage self = pool[ammId];
+
+        if (!self.isInitialized()) {
+            revert NotInitialized();
+        }
+
+        (uint256 amount0, uint256 amount1,,) = pool[toAmmId(token0, token1)].tryRemoveLiquidity(liquidityAmount);
+        (,, amountRa, amountCt) = reverseSortWithAmount(ra, ct, token0, token1, amount0, amount1);
+
+        RemoveLiquidtyParams memory params = RemoveLiquidtyParams(token0, token1, liquidityAmount, msg.sender);
+
+        bytes memory data = abi.encode(Action.RemoveLiquidity, params);
+
+        poolManager.unlock(data);
+    }
+
+    function _unlockCallback(bytes calldata data) internal virtual override returns (bytes memory) {
+        Action action = abi.decode(data, (Action));
+
+        if (action == Action.AddLiquidity) {
+            (, AddLiquidtyParams memory params) = abi.decode(data, (Action, AddLiquidtyParams));
+
+            _addLiquidity(pool[toAmmId(params.token0, params.token1)], params.amount0, params.amount1, params.sender);
+            // TODO : find out what the return value should be used for
+            return "";
+        }
+
+        if (action == Action.RemoveLiquidity) {
+            (, RemoveLiquidtyParams memory params) = abi.decode(data, (Action, RemoveLiquidtyParams));
+
+            _removeLiquidity(pool[toAmmId(params.token0, params.token1)], params.liquidityAmount, params.sender);
+            // TODO : find out what the return value should be used for
+            return "";
+        }
+
+        return "";
+    }
+
+    function getLiquidityToken(address ra, address ct) external view onlyInitialized(ra, ct) returns (address) {
+        return address(pool[toAmmId(ra, ct)].liquidityToken);
+    }
+
+    function getReserves(address ra, address ct) external view onlyInitialized(ra, ct) returns (uint256, uint256) {
+        return (pool[toAmmId(ra, ct)].reserve0, pool[toAmmId(ra, ct)].reserve1);
     }
 }
