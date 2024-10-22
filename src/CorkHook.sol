@@ -1,21 +1,19 @@
-pragma solidity ^0.8.19;
+pragma solidity 0.8.26;
 
 // TODO : refactor named imports
-import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {Strings} from "openzeppelin-contracts/contracts/utils/Strings.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
-import "v4-periphery/lib/v4-core/src/interfaces/IPoolManager.sol";
-import "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
-import "v4-periphery/lib/v4-core/src/types/PoolId.sol";
-import "v4-periphery/lib/v4-core/src/types/BalanceDelta.sol";
-import "v4-periphery/lib/v4-core/src/types/Currency.sol";
-import "v4-periphery/src/base/hooks/BaseHook.sol";
-import "./LiquidityToken.sol";
+import {IPoolManager} from "v4-periphery/lib/v4-core/src/interfaces/IPoolManager.sol";
+import {PoolKey} from "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
+import {PoolIdLibrary} from "v4-periphery/lib/v4-core/src/types/PoolId.sol";
+import {Currency} from "v4-periphery/lib/v4-core/src/types/Currency.sol";
+import {BaseHook} from "v4-periphery/src/base/hooks/BaseHook.sol";
+import {CurrencySettler} from "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
+import {LiquidityToken} from "./LiquidityToken.sol";
+import {Action, AddLiquidtyParams, RemoveLiquidtyParams} from "./lib/Calls.sol";
 import "./lib/State.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
-import "openzeppelin-contracts/contracts/utils/Strings.sol";
-import "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
-import "./lib/Calls.sol";
-import "forge-std/console.sol";
 
 // TODO : create interface, events, and move errors
 contract CorkHook is BaseHook {
@@ -92,7 +90,7 @@ contract CorkHook is BaseHook {
         pool[ammId].initialize(token0, token1, address(lp));
 
         // the reason we just concatenate the addresses instead of their respective symbols is that because this way, we don't need to worry about
-        // tokens symbols to have different encoding and other shinanigans. Frontend should parse and display the token symbols accordingly 
+        // tokens symbols to have different encoding and other shinanigans. Frontend should parse and display the token symbols accordingly
         string memory identifier =
             string.concat(Strings.toHexString(uint160(token0)), "-", Strings.toHexString(uint160(token1)));
 

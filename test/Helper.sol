@@ -47,7 +47,7 @@ contract TestHelper is Test, Deployers {
         lpBase = new LiquidityToken();
 
         deployCodeTo("TestCorkHook.sol", abi.encode(poolManager, lpBase), address(flags));
-        
+
         hook = TestCorkHook(address(flags));
     }
 
