@@ -51,12 +51,17 @@ contract CorkHook is BaseHook {
         _;
     }
 
-    // TODO : placeholder 
-    function swap() internal{
+    function beforeSwap(address, PoolKey calldata, IPoolManager.SwapParams calldata, bytes calldata)
+        external
+        virtual
+        override
+        returns (bytes4, BeforeSwapDelta, uint24)
+    {
         // we calculate how much they must pay
         // we transfer their tokens
         // we call their callback if they specify(they should approve us to spend their tokens equals to how much they must pay)
         // we transfer user tokens to the pool equal to how much they must pay
+        return this.beforeSwap.selector;
     }
 
     function getHookPermissions() public pure virtual override returns (Hooks.Permissions memory) {
@@ -101,7 +106,7 @@ contract CorkHook is BaseHook {
         pool[ammId].initialize(token0, token1, address(lp));
 
         // the reason we just concatenate the addresses instead of their respective symbols is that because this way, we don't need to worry about
-        // tokens symbols to have different encoding and other shinanigans. Frontend should parse and display the token symbols accordingly 
+        // tokens symbols to have different encoding and other shinanigans. Frontend should parse and display the token symbols accordingly
         string memory identifier =
             string.concat(Strings.toHexString(uint160(token0)), "-", Strings.toHexString(uint160(token1)));
 

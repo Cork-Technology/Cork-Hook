@@ -8,5 +8,5 @@ interface CorkSwapCallback {
      * @param paymentAmount the amount of tokens that the user must approve to be spent by the hook, DO NOT transfer token directly, the hook will takes care of that. the amount will be calculated in respect of your specified token to pay. 
      * @param zeroForOne if true, the user must pay token0, otherwise token1
      */
-    function call(bytes calldata data, uint256 paymentAmount, bool zeroForOne) external;
+    function CorkCall(bytes calldata data, uint256 paymentAmount, bool zeroForOne) external;
 }
