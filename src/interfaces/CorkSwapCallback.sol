@@ -7,7 +7,7 @@ interface CorkSwapCallback {
      * @param sender the address that initiated the swap
      * @param data the data that will be passed to the callback
      * @param paymentAmount the amount of tokens that the user must approve to be spent by the hook, DO NOT transfer token directly, the hook will takes care of that. the amount will be calculated in respect of your specified token to pay.
-     * @param zeroForOne if true, the user must pay token0, otherwise token1
+     * @param paymentToken the token that the user must approve to be spent by the hook, DO NOT transfer token directly, you will lose your funds.
      */
-    function CorkCall(address sender, bytes calldata data, uint256 paymentAmount, bool zeroForOne) external;
+    function CorkCall(address sender, bytes calldata data, uint256 paymentAmount, address paymentToken) external;
 }

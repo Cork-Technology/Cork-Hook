@@ -219,17 +219,9 @@ contract CorkHook is BaseHook {
         PoolKey calldata key,
         IPoolManager.SwapParams calldata params,
         bytes calldata hookData
-    )
-        external
-        override
-        onlyInitialized(Currency.unwrap(key.currency0), Currency.unwrap(key.currency1))
-        returns (bytes4, BeforeSwapDelta, uint24)
-    {
-        {
-            PoolState storage self = pool[toAmmId(Currency.unwrap(key.currency0), Currency.unwrap(key.currency1))];
-            // _beforeSwap(self, params.amountSpecified, params.zeroForOne, hookData, sender);
-        }
-       
+    ) external override returns (bytes4, BeforeSwapDelta, uint24) {
+        PoolState storage self = pool[toAmmId(Currency.unwrap(key.currency0), Currency.unwrap(key.currency1))];
+        _beforeSwap(self, params.amountSpecified, params.zeroForOne, hookData, sender);
     }
 
     function _beforeSwap(
@@ -266,32 +258,8 @@ contract CorkHook is BaseHook {
 
         // there is data, means flash swap
         if (hookData.length > 0) {
-            // infer what token would be used for payment, if counterPayment is true, then the input token is used for payment, otherwise its the output token
-            bool counterPayment = abi.decode(hookData, (bool));
-            // we expect user to use exact output swap when dealing with flash swap
-            // so we use amountOut as the payment amount cause they simply have to return the borrowed amount
-            // or it's the in amount that they have to pay with the other token
-            uint256 paymentAmount = counterPayment ? amountIn : amountOut;
-
-            // call the callback
-            // TODO : maybe pass the payment token instead?
-            CorkSwapCallback(sender).CorkCall(sender, hookData, paymentAmount, counterPayment);
-
-            // process repayments
-            if (counterPayment) {
-                // update reserve
-                self.updateReserves(Currency.unwrap(input), amountIn, false);
-
-                input.settle(poolManager, sender, amountIn, true);
-                input.take(poolManager, address(this), amountIn, false);
-            } else {
-                // update reserve
-                self.updateReserves(Currency.unwrap(output), amountOut, false);
-
-                output.settle(poolManager, sender, amountOut, true);
-                output.take(poolManager, address(this), amountOut, false);
-            }
-
+            // avoid stack too deep
+            _executeFlashSwap(self, hookData, input, output, amountIn, amountOut, sender);
             // no data, means normal swap
         } else {
             // update reserve
@@ -306,6 +274,42 @@ contract CorkHook is BaseHook {
 
         // ensure k isn't less than before
         require(kAfter >= kBefore, "K_DECREASED");
+    }
+
+    function _executeFlashSwap(
+        PoolState storage self,
+        bytes calldata hookData,
+        Currency input,
+        Currency output,
+        uint256 amountIn,
+        uint256 amountOut,
+        address sender
+    ) internal {
+        // infer what token would be used for payment, if counterPayment is true, then the input token is used for payment, otherwise its the output token
+        bool counterPayment = abi.decode(hookData, (bool));
+        // we expect user to use exact output swap when dealing with flash swap
+        // so we use amountOut as the payment amount cause they simply have to return the borrowed amount
+        // or it's the in amount that they have to pay with the other token
+        (uint256 paymentAmount, address paymentToken) =
+            counterPayment ? (amountIn, Currency.unwrap(input)) : (amountOut, Currency.unwrap(output));
+
+        // call the callback
+        CorkSwapCallback(sender).CorkCall(sender, hookData, paymentAmount, paymentToken);
+
+        // process repayments
+        if (counterPayment) {
+            // update reserve
+            self.updateReserves(Currency.unwrap(input), amountIn, false);
+
+            input.settle(poolManager, sender, amountIn, true);
+            input.take(poolManager, address(this), amountIn, false);
+        } else {
+            // update reserve
+            self.updateReserves(Currency.unwrap(output), amountOut, false);
+
+            output.settle(poolManager, sender, amountOut, true);
+            output.take(poolManager, address(this), amountOut, false);
+        }
     }
 
     function _getAmountIn(PoolState storage self, bool zeroForOne, uint256 amountOut)
