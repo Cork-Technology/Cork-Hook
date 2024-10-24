@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 import "./LiquidityMath.sol";
 import "./../LiquidityToken.sol";
 import "v4-periphery/lib/v4-core/src/types/Currency.sol";
+import "./balancers/FixedPoint.sol";
 
 /// @notice amm id,
 type AmmId is bytes32;
@@ -44,9 +45,13 @@ struct PoolState {
     address token1;
     // should be deployed using clones
     LiquidityToken liquidityToken;
+    // base fee in 18 decimals, 1% is 1e18\
+    uint256 fee;
 }
 
 library PoolStateLibrary {
+    uint256 constant MAX_FEE = FixedPoint.ONE * 100;
+
     function updateReserves(PoolState storage state, address token, uint256 amount, bool minus) internal {
         if (token == state.token0) {
             state.reserve0 = minus ? state.reserve0 - amount : state.reserve0 + amount;
@@ -56,6 +61,12 @@ library PoolStateLibrary {
             // TODO : move to interface
             revert("Token not in pool");
         }
+    }
+
+    function updateFee(PoolState storage state, uint256 fee) internal {
+        // TODO : move to interface
+        require(fee <= MAX_FEE, "Fee too high");
+        state.fee = fee;
     }
 
     function getToken0(PoolState storage state) internal view returns (Currency) {

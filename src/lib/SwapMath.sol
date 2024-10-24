@@ -42,7 +42,6 @@ library SwapMath {
 
         // Calculate amountIn = q - reserveIn
         amountIn = q.sub(reserveIn);
-
     }
 
     /// @notice Get normalized time (t) as a value between 0 and 1
@@ -59,6 +58,23 @@ library SwapMath {
     /// @notice calculate 1 - t
     function oneMinusT(uint256 startTime, uint256 maturityTime) public view returns (uint256) {
         return FixedPoint.complement(getNormalizedTime(startTime, maturityTime));
+    }
+
+    /// @notice feePercentage =  baseFee x t. where t is normalized time
+    function getFeePercentage(uint256 baseFee, uint256 startTime, uint256 maturityTime) public view returns (uint256) {
+        uint256 t = getNormalizedTime(startTime, maturityTime);
+        return baseFee.mulDown(t);
+    }
+
+    /// @notice calculate percentage of an amount = amount * percentage / 100
+    function calculatePercentage(uint256 percentage, uint256 amount) public pure returns (uint256) {
+        return amount.mulDown(percentage).divDown(FixedPoint.ONE * 100);
+    }
+
+    /// @notice calculate fee = amount * (baseFee x t) / 100
+    function getFee(uint256 amount, uint256 baseFee, uint256 startTime, uint256 maturityTime) public view returns (uint256) {
+        uint256 feePercentage = getFeePercentage(baseFee, startTime, maturityTime);
+        return calculatePercentage(feePercentage, amount);
     }
 
     /// @notice calculate k = x^(1-t) + y^(1-t)

@@ -19,11 +19,12 @@ import "forge-std/console.sol";
 import "./lib/SwapMath.sol";
 import "./interfaces/CorkAsset.sol";
 import "./interfaces/CorkSwapCallback.sol";
+import "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 // TODO : create interface, events, and move errors
 // TODO : use id instead of tokens address
 // TOD : refactor and move some to state.sol
-contract CorkHook is BaseHook {
+contract CorkHook is BaseHook, Ownable {
     using Clones for address;
     using PoolStateLibrary for PoolState;
     using PoolIdLibrary for PoolKey;
@@ -41,7 +42,7 @@ contract CorkHook is BaseHook {
     // we will deploy proxy to this address for each pool
     address lpBase;
 
-    constructor(IPoolManager _poolManager, LiquidityToken _lpBase) BaseHook(_poolManager) {
+    constructor(IPoolManager _poolManager, LiquidityToken _lpBase) BaseHook(_poolManager) Ownable(msg.sender) {
         lpBase = address(_lpBase);
     }
 
@@ -144,7 +145,7 @@ contract CorkHook is BaseHook {
         (address token0, address token1, uint256 amount0, uint256 amount1) = sort(ra, ct, raAmount, ctAmount);
 
         // all sanitiy check should go here
-        // TODO : maybe add more sanity checks
+        // TODO : auto-initialize pool if not initialized
 
         // retruns how much liquidity token was minted
         (,, mintedLp) = pool[toAmmId(token0, token1)].tryAddLiquidity(amount0, amount1);
@@ -270,10 +271,40 @@ contract CorkHook is BaseHook {
             input.take(poolManager, address(this), amountIn, false);
         }
 
-        (uint256 kAfter,) = _k(self);
+        (uint256 kAfter,) = _kWithFee(self, amountIn, input);
 
         // ensure k isn't less than before
         require(kAfter >= kBefore, "K_DECREASED");
+    }
+
+    function _kWithFee(PoolState storage self, uint256 amountIn, Currency input)
+        internal
+        view
+        returns (uint256 k, uint256 fee)
+    {
+        (uint256 start, uint256 end) = _getIssuedAndMaturationTime(self);
+        fee = SwapMath.getFee(amountIn, self.fee, start, end);
+
+        (uint256 reserve0, uint256 reserve1) = (self.reserve0, self.reserve1);
+
+        // subtract from reserve if input is token0
+        reserve0 = Currency.unwrap(input) == self.token0 ? reserve0 - fee : reserve0;
+        // subtract from reserve if input is token1
+        reserve1 = Currency.unwrap(input) == self.token1 ? reserve1 - fee : reserve1;
+
+        k = SwapMath.getInvariant(reserve0, reserve1, start, end);
+    }
+
+    function getFee(address ra, address ct)
+        external
+        view
+        onlyInitialized(ra, ct)
+        returns (uint256 baseFeePercentage, uint256 actualFeePercentage)
+    {
+        baseFeePercentage = pool[toAmmId(ra, ct)].fee;
+
+        (uint256 start, uint256 end) = _getIssuedAndMaturationTime(pool[toAmmId(ra, ct)]);
+        actualFeePercentage = SwapMath.getFeePercentage(baseFeePercentage, start, end);
     }
 
     function _executeFlashSwap(
