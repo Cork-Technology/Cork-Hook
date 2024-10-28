@@ -283,7 +283,7 @@ contract CorkHook is BaseHook, Ownable {
         returns (uint256 k, uint256 fee)
     {
         (uint256 start, uint256 end) = _getIssuedAndMaturationTime(self);
-        fee = SwapMath.getFee(amountIn, self.fee, start, end);
+        fee = SwapMath.getFee(amountIn, self.fee, start, end, block.timestamp);
 
         (uint256 reserve0, uint256 reserve1) = (self.reserve0, self.reserve1);
 
@@ -292,7 +292,7 @@ contract CorkHook is BaseHook, Ownable {
         // subtract from reserve if input is token1
         reserve1 = Currency.unwrap(input) == self.token1 ? reserve1 - fee : reserve1;
 
-        k = SwapMath.getInvariant(reserve0, reserve1, start, end);
+        k = SwapMath.getInvariant(reserve0, reserve1, start, end, block.timestamp);
     }
 
     function getFee(address ra, address ct)
@@ -304,7 +304,7 @@ contract CorkHook is BaseHook, Ownable {
         baseFeePercentage = pool[toAmmId(ra, ct)].fee;
 
         (uint256 start, uint256 end) = _getIssuedAndMaturationTime(pool[toAmmId(ra, ct)]);
-        actualFeePercentage = SwapMath.getFeePercentage(baseFeePercentage, start, end);
+        actualFeePercentage = SwapMath.getFeePercentage(baseFeePercentage, start, end, block.timestamp);
     }
 
     function _executeFlashSwap(
@@ -405,7 +405,7 @@ contract CorkHook is BaseHook, Ownable {
         (uint256 reserve0, uint256 reserve1) = (self.reserve0, self.reserve1);
         (uint256 start, uint256 end) = _getIssuedAndMaturationTime(self);
 
-        invariant = SwapMath.getInvariant(reserve0, reserve1, start, end);
-        oneMinusT = SwapMath.oneMinusT(start, end);
+        invariant = SwapMath.getInvariant(reserve0, reserve1, start, end, block.timestamp);
+        oneMinusT = SwapMath.oneMinusT(start, end, block.timestamp);
     }
 }
