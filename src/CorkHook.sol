@@ -21,6 +21,7 @@ import "./interfaces/CorkAsset.sol";
 import "./interfaces/CorkSwapCallback.sol";
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
 import "./Initializer.sol";
+import "./Constants.sol";
 
 // TODO : create interface, events, and move errors
 // TODO : use id instead of tokens address
@@ -109,6 +110,31 @@ contract CorkHook is BaseHook, Ownable {
         lp.initialize(string.concat("Liquidity Token ", identifier), string.concat("LP-", identifier), address(this));
 
         return this.beforeInitialize.selector;
+    }
+
+    function swap(address ra, address ct, uint256 amountRaOut, uint256 amountCtOut, bytes calldata data)
+        external
+        onlyInitialized(ra, ct)
+    {
+        (address token0, address token1, uint256 amount0, uint256 amount1) = sort(ra, ct, amountRaOut, amountCtOut);
+
+        // all sanitiy check should go here
+        if (amount0 >= 0 || amount1 >= 0) {
+            revert("Invalid amount");
+        }
+
+        IPoolManager.SwapParams memory ammSwapParams =
+            IPoolManager.SwapParams(amount0 > 0, -int256(amount0), Constants.SQRT_PRICE_1_1);
+        PoolKey memory key = getPoolKey(token0, token1);
+        SwapParams memory params = SwapParams(data, ammSwapParams, key);
+
+        bytes memory swapData = abi.encode(Action.Swap, params);
+
+        poolManager.unlock(swapData);
+    }
+
+    function _initSwap(SwapParams memory params) internal {
+        poolManager.swap(params.poolKey, params.params, params.swapData);
     }
 
     function _addLiquidity(PoolState storage self, uint256 amount0, uint256 amount1, address sender) internal {
@@ -206,7 +232,7 @@ contract CorkHook is BaseHook, Ownable {
             (, AddLiquidtyParams memory params) = abi.decode(data, (Action, AddLiquidtyParams));
 
             _addLiquidity(pool[toAmmId(params.token0, params.token1)], params.amount0, params.amount1, params.sender);
-            // TODO : find out what the return value should be used for
+            // TODO : right now the selector return is unused
             return "";
         }
 
@@ -214,8 +240,14 @@ contract CorkHook is BaseHook, Ownable {
             (, RemoveLiquidtyParams memory params) = abi.decode(data, (Action, RemoveLiquidtyParams));
 
             _removeLiquidity(pool[toAmmId(params.token0, params.token1)], params.liquidityAmount, params.sender);
-            // TODO : find out what the return value should be used for
+            // TODO : right now the selector return is unused
             return "";
+        }
+
+        if(action == Action.Swap) {
+            (, SwapParams memory params) = abi.decode(data, (Action, SwapParams));
+
+            _initSwap(params);
         }
 
         return "";
@@ -263,6 +295,8 @@ contract CorkHook is BaseHook, Ownable {
         (Currency input, Currency output) = _getInputOutput(self, zeroForOne);
 
         (uint256 kBefore,) = _k(self);
+
+        self.ensureLiquidityEnough(amountOut, Currency.unwrap(output));
 
         // update reserve
         self.updateReserves(Currency.unwrap(output), amountOut, true);
@@ -421,5 +455,12 @@ contract CorkHook is BaseHook, Ownable {
 
         invariant = SwapMath.getInvariant(reserve0, reserve1, start, end, block.timestamp);
         oneMinusT = SwapMath.oneMinusT(start, end, block.timestamp);
+    }
+
+    function getPoolKey(address ra, address ct) public view returns (PoolKey memory) {
+        (address token0, address token1) = sort(ra, ct);
+        return PoolKey(
+            Currency.wrap(token0), Currency.wrap(token1), Constants.FEE, Constants.TICK_SPACING, IHooks(address(this))
+        );
     }
 }

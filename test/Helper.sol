@@ -47,7 +47,7 @@ contract TestHelper is Test, Deployers {
         lpBase = new LiquidityToken();
 
         deployCodeTo("TestCorkHook.sol", abi.encode(poolManager, lpBase), address(flags));
-        
+
         hook = TestCorkHook(address(flags));
     }
 
@@ -60,6 +60,18 @@ contract TestHelper is Test, Deployers {
         PoolKey memory key = PoolKey(Currency.wrap(address(token0)), Currency.wrap(address(token1)), 0, 1, IHooks(hook));
 
         poolManager.initialize(key, SQRT_PRICE_1_1);
+    }
+
+    function thenAddLiquidity(uint256 amount0, uint256 amount1) public {
+        token0.mint(DEFAULT_ADDRESS, amount0);
+        token1.mint(DEFAULT_ADDRESS, amount1);
+
+        vm.startPrank(DEFAULT_ADDRESS);
+        token0.approve(address(hook), amount0);
+        token1.approve(address(hook), amount1);
+
+        hook.addLiquidity(address(token0), address(token1), amount0, amount1);
+        vm.stopPrank();
     }
 }
 

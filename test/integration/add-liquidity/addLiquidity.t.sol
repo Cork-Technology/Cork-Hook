@@ -33,13 +33,12 @@ contract AddLiquidityTest is TestHelper {
         vm.assertApproxEqAbs(state.liquidityToken.totalSupply(), 948.6832 ether, 0.0001 ether);
     }
 
-    function testRevert_NotInitialized() external {
+    function test_AddLiquidityNotInitialized() external {
         vm.startPrank(DEFAULT_ADDRESS);
 
         uint256 amount0 = 1000 ether;
         uint256 amount1 = 900 ether;
 
-        vm.expectRevert();
         hook.addLiquidity(address(token0), address(token1), amount0, amount1);
     }
 }

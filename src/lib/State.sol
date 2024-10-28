@@ -52,6 +52,17 @@ struct PoolState {
 library PoolStateLibrary {
     uint256 constant MAX_FEE = FixedPoint.ONE * 100;
 
+    function ensureLiquidityEnough(PoolState storage state, uint256 amountOut, address token) internal view {
+        if (token == state.token0 && state.reserve0 < amountOut) {
+            revert("Not enough liquidity");
+        } else if (token == state.token1 && state.reserve1 < amountOut) {
+            revert("Not enough liquidity");
+        } else {
+            // TODO : move to interface
+            revert("Token not in pool");
+        }
+    }
+
     function updateReserves(PoolState storage state, address token, uint256 amount, bool minus) internal {
         if (token == state.token0) {
             state.reserve0 = minus ? state.reserve0 - amount : state.reserve0 + amount;
