@@ -20,9 +20,11 @@ import "./lib/SwapMath.sol";
 import "./interfaces/CorkAsset.sol";
 import "./interfaces/CorkSwapCallback.sol";
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
+import "./Initializer.sol";
 
 // TODO : create interface, events, and move errors
 // TODO : use id instead of tokens address
+// TODO : make documentation on how to properly initialize the pool
 // TOD : refactor and move some to state.sol
 contract CorkHook is BaseHook, Ownable {
     using Clones for address;
@@ -41,9 +43,11 @@ contract CorkHook is BaseHook, Ownable {
 
     // we will deploy proxy to this address for each pool
     address lpBase;
+    PoolInitializer initializer;
 
     constructor(IPoolManager _poolManager, LiquidityToken _lpBase) BaseHook(_poolManager) Ownable(msg.sender) {
         lpBase = address(_lpBase);
+        initializer = new PoolInitializer(_poolManager);
     }
 
     modifier onlyInitialized(address a, address b) {
@@ -137,15 +141,25 @@ contract CorkHook is BaseHook, Ownable {
         token1.take(poolManager, sender, amount1, false);
     }
 
+    function updateBaseFeePercentage(address ra, address ct, uint256 baseFeePercentage)
+        external
+        onlyOwner
+        onlyInitialized(ra, ct)
+    {
+        pool[toAmmId(ra, ct)].fee = baseFeePercentage;
+    }
+
     function addLiquidity(address ra, address ct, uint256 raAmount, uint256 ctAmount)
         external
-        onlyInitialized(ra, ct)
         returns (uint256 mintedLp)
     {
         (address token0, address token1, uint256 amount0, uint256 amount1) = sort(ra, ct, raAmount, ctAmount);
 
         // all sanitiy check should go here
         // TODO : auto-initialize pool if not initialized
+        if (!pool[toAmmId(token0, token1)].isInitialized()) {
+            initializer.initializePool(token0, token1);
+        }
 
         // retruns how much liquidity token was minted
         (,, mintedLp) = pool[toAmmId(token0, token1)].tryAddLiquidity(amount0, amount1);
