@@ -355,7 +355,7 @@ contract CorkHook is BaseHook, Ownable {
         require(reserveIn > 0 && reserveOut > 0, "INSUFFICIENT_LIQUIDITY");
 
         (uint256 invariant, uint256 oneMinusT) = _k(self);
-        amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, invariant, oneMinusT);
+        amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, invariant, oneMinusT, self.fee);
     }
 
     function _getAmountOut(PoolState storage self, bool zeroForOne, uint256 amountIn)
@@ -370,7 +370,7 @@ contract CorkHook is BaseHook, Ownable {
         require(reserveIn > 0 && reserveOut > 0, "INSUFFICIENT_LIQUIDITY");
 
         (uint256 invariant, uint256 oneMinusT) = _k(self);
-        amountOut = SwapMath.getAmountOut(amountIn, reserveIn, reserveOut, invariant, oneMinusT);
+        amountOut = SwapMath.getAmountOut(amountIn, reserveIn, reserveOut, invariant, oneMinusT, self.fee);
     }
 
     function _getInputOutput(PoolState storage self, bool zeroForOne)

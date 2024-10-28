@@ -7,11 +7,19 @@ library SwapMath {
     using FixedPoint for uint256;
 
     /// @notice amountOut =  reserveOut - (k - (reserveIn + amountIn)^(1-t))^1/(1-t)
-    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut, uint256 kInitial, uint256 _1MinT)
-        internal
-        pure
-        returns (uint256 amountOut)
-    {
+    function getAmountOut(
+        uint256 amountIn,
+        uint256 reserveIn,
+        uint256 reserveOut,
+        uint256 kInitial,
+        uint256 _1MinT,
+        uint256 baseFee
+    ) internal pure returns (uint256 amountOut) {
+        // Calculate fee factor = 1 - feePercentage
+        uint256 feeFactor = FixedPoint.complement(baseFee.mulDown(_1MinT));
+        // Calculate amountIn after fee = amountIn * feeFactor
+        amountIn = amountIn.mulDown(feeFactor);
+
         uint256 reserveInExp = FixedPoint.powDown(reserveIn, _1MinT);
         uint256 reserveOutExp = FixedPoint.powDown(reserveOut, _1MinT);
         uint256 k = reserveInExp.add(reserveOutExp);
@@ -26,11 +34,14 @@ library SwapMath {
     }
 
     /// @notice amountIn = (k - (reserveOut - amountOut)^(1-t))^1/(1-t) - reserveIn
-    function getAmountIn(uint256 amountOut, uint256 reserveIn, uint256 reserveOut, uint256 kInitial, uint256 _1MinT)
-        internal
-        pure
-        returns (uint256 amountIn)
-    {
+    function getAmountIn(
+        uint256 amountOut,
+        uint256 reserveIn,
+        uint256 reserveOut,
+        uint256 kInitial,
+        uint256 _1MinT,
+        uint256 baseFee
+    ) internal pure returns (uint256 amountIn) {
         uint256 reserveInExp = FixedPoint.powDown(reserveIn, _1MinT);
         uint256 reserveOutExp = FixedPoint.powDown(reserveOut, _1MinT);
         uint256 k = reserveInExp.add(reserveOutExp);
@@ -42,6 +53,10 @@ library SwapMath {
 
         // Calculate amountIn = q - reserveIn
         amountIn = q.sub(reserveIn);
+        // Calculate fee factor = 1 - feePercentage
+        uint256 feeFactor = FixedPoint.complement(baseFee.mulDown(_1MinT));
+        // Calculate amountIn after fee = amountIn * feeFactor
+        amountIn = amountIn.mulDown(feeFactor);
     }
 
     /// @notice Get normalized time (t) as a value between 0 and 1
@@ -72,7 +87,11 @@ library SwapMath {
     }
 
     /// @notice calculate fee = amount * (baseFee x t) / 100
-    function getFee(uint256 amount, uint256 baseFee, uint256 startTime, uint256 maturityTime) public view returns (uint256) {
+    function getFee(uint256 amount, uint256 baseFee, uint256 startTime, uint256 maturityTime)
+        public
+        view
+        returns (uint256)
+    {
         uint256 feePercentage = getFeePercentage(baseFee, startTime, maturityTime);
         return calculatePercentage(feePercentage, amount);
     }
