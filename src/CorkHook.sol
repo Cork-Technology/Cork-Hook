@@ -17,7 +17,7 @@ import "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
 import "./lib/Calls.sol";
 import "forge-std/console.sol";
 import "./lib/SwapMath.sol";
-import "./interfaces/CorkAsset.sol";
+import "Depeg-swap/contracts/interfaces/IExpiry.sol";
 import "./interfaces/CorkSwapCallback.sol";
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
 import "./Forwarder.sol";
@@ -114,6 +114,16 @@ contract CorkHook is BaseHook, Ownable {
         return this.beforeInitialize.selector;
     }
 
+    function _ensureValidAmount(uint256 amount0, uint256 amount1) internal pure {
+        if (amount0 == 0 && amount1 == 0) {
+            revert("Invalid Amount");
+        }
+
+        if (amount0 != 0 && amount1 != 0) {
+            revert("Invalid Amount");
+        }
+    }
+
     function swap(address ra, address ct, uint256 amountRaOut, uint256 amountCtOut, bytes calldata data)
         external
         onlyInitialized(ra, ct)
@@ -121,9 +131,7 @@ contract CorkHook is BaseHook, Ownable {
         (address token0, address token1, uint256 amount0, uint256 amount1) = sort(ra, ct, amountRaOut, amountCtOut);
 
         // all sanitiy check should go here
-        if (amount0 == 0 && amount1 == 0) {
-            revert("Invalid Amount");
-        }
+        _ensureValidAmount(amount0, amount1);
 
         IPoolManager.SwapParams memory ammSwapParams;
 
@@ -276,6 +284,7 @@ contract CorkHook is BaseHook, Ownable {
         return (pool[toAmmId(ra, ct)].reserve0, pool[toAmmId(ra, ct)].reserve1);
     }
 
+    // IMPORTANT: ALL SWAP MUST GIVE 11000 WEI EXTRA TO AVOID K DECREASED
     function beforeSwap(
         address sender,
         PoolKey calldata key,
@@ -284,19 +293,23 @@ contract CorkHook is BaseHook, Ownable {
     ) external override returns (bytes4, BeforeSwapDelta delta, uint24) {
         PoolState storage self = pool[toAmmId(Currency.unwrap(key.currency0), Currency.unwrap(key.currency1))];
         // kinda packed, avoid stack too deep
-        delta =
-            toBeforeSwapDelta(-int128(params.amountSpecified), -int128(uint128(_beforeSwap(self, params, hookData))));
+
+        delta = toBeforeSwapDelta(
+            -int128(params.amountSpecified), int128(int256(_beforeSwap(self, params, hookData, sender)))
+        );
 
         // TODO: do we really need to specify the fee here?
         return (this.beforeSwap.selector, delta, 0);
     }
 
-    function _beforeSwap(PoolState storage self, IPoolManager.SwapParams calldata params, bytes calldata hookData)
-        internal
-        returns (uint256 amountOut)
-    {
-        // load sender from slot
-        address sender = SenderSlot.sender();
+    function _beforeSwap(
+        PoolState storage self,
+        IPoolManager.SwapParams calldata params,
+        bytes calldata hookData,
+        address sender
+    ) internal returns (uint256 amountOut) {
+        // load sender from slot or from
+        sender = SenderSlot.sender() == address(0) ? sender : SenderSlot.sender();
 
         bool exactIn = (params.amountSpecified < 0);
         uint256 amountIn;
@@ -314,6 +327,8 @@ contract CorkHook is BaseHook, Ownable {
 
         (Currency input, Currency output) = _getInputOutput(self, params.zeroForOne);
 
+        console.log("amountIn", amountIn);
+        console.log("amountOut", amountOut);
         (uint256 kBefore,) = _k(self);
 
         self.ensureLiquidityEnough(amountOut, Currency.unwrap(output));
@@ -323,7 +338,7 @@ contract CorkHook is BaseHook, Ownable {
 
         // we transfer their tokens
         output.settle(poolManager, address(this), amountOut, true);
-        output.take(poolManager, sender, amountOut, false);
+        // output.take(poolManager, sender, amountOut, false);
 
         // there is data, means flash swap
         if (hookData.length > 0) {
@@ -335,8 +350,8 @@ contract CorkHook is BaseHook, Ownable {
             self.updateReserves(Currency.unwrap(input), amountIn, false);
 
             // settle swap
-            input.settle(poolManager, sender, amountIn, true);
-            input.take(poolManager, address(this), amountIn, false);
+            // input.settle(poolManager, sender, amountIn, false);
+            // input.take(poolManager, sender, amountIn, true);
         }
 
         (uint256 kAfter,) = _kWithFee(self, amountIn, input);
@@ -423,7 +438,8 @@ contract CorkHook is BaseHook, Ownable {
         require(reserveIn > 0 && reserveOut > 0, "INSUFFICIENT_LIQUIDITY");
 
         (uint256 invariant, uint256 oneMinusT) = _k(self);
-        amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, invariant, oneMinusT, self.fee);
+        // TODO : workaround for now, if not for this then the k will decrease slightly than we expected
+        amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, invariant, oneMinusT, self.fee) + 11000;
     }
 
     function _getAmountOut(PoolState storage self, bool zeroForOne, uint256 amountIn)
