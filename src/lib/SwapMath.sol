@@ -25,7 +25,11 @@ library SwapMath {
         amountIn = amountIn.sub(fee);
 
         uint256 reserveInExp = LogExpMath.pow(reserveIn, _1MinT);
+        console.log("reserveInExp: ", reserveInExp);
+
         uint256 reserveOutExp = LogExpMath.pow(reserveOut, _1MinT);
+        console.log("reserveOutExp: ", reserveOutExp);
+
         uint256 k = reserveInExp.add(reserveOutExp);
 
         assert(k >= kInitial);
@@ -50,7 +54,11 @@ library SwapMath {
         uint256 baseFee
     ) internal pure returns (uint256 amountIn) {
         uint256 reserveInExp = LogExpMath.pow(reserveIn, _1MinT);
+        console.log("reserveInExp: ", reserveInExp);
+
         uint256 reserveOutExp = LogExpMath.pow(reserveOut, _1MinT);
+        console.log("reserveOutExp: ", reserveOutExp);
+        
         uint256 k = reserveInExp.add(reserveOutExp);
 
         assert(k >= kInitial);

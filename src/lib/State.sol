@@ -20,6 +20,14 @@ function toAmmId(Currency _ra, Currency _ct) pure returns (AmmId) {
     return toAmmId(ra, ct);
 }
 
+struct SortResult {
+    address token0;
+    address token1;
+    uint256 amount0;
+    uint256 amount1;
+
+}
+
 function sort(address a, address b) pure returns (address, address) {
     return a < b ? (a, b) : (b, a);
 }
@@ -38,6 +46,14 @@ function sort(address a, address b, uint256 amountA, uint256 amountB)
     return a < b ? (a, b, amountA, amountB) : (b, a, amountB, amountA);
 }
 
+function sortPacked(address a, address b, uint256 amountA, uint256 amountB)
+    pure
+    returns (SortResult memory)
+{
+    (address token0, address token1, uint256 amount0, uint256 amount1) = sort(a, b, amountA, amountB);
+
+    return SortResult(token0, token1, amount0, amount1);
+}
 struct PoolState {
     uint256 reserve0;
     uint256 reserve1;

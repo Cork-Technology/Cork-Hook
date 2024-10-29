@@ -7,10 +7,10 @@ contract SenderSlotTest is Test {
     function test_senderSlot() public {
         address sender = address(1);
         
-        SenderSlot.setSender(sender);
-        vm.assertEq(SenderSlot.sender(), sender);
+        SenderSlot.set(sender);
+        vm.assertEq(SenderSlot.get(), sender);
         
-        SenderSlot.clearSender();
-        vm.assertEq(SenderSlot.sender(), address(0));
+        SenderSlot.clear();
+        vm.assertEq(SenderSlot.get(), address(0));
     }
 } 

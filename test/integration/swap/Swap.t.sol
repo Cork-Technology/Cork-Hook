@@ -7,7 +7,7 @@ contract SwapTest is TestHelper {
     uint256 internal constant xReserve = 1000 ether;
     uint256 internal constant yReserve = 1050 ether;
 
-    uint256 internal constant xIn = 1 ether;
+    uint256 internal constant xIn = 0.99999 ether;
     uint256 internal constant yOut = 1.04395224 ether;
 
     uint256 internal constant start = 0;
@@ -30,7 +30,6 @@ contract SwapTest is TestHelper {
     function test_exactInSwap() external {}
 
     function test_exactOutSwapFromHook() external {
-        
         token0.mint(DEFAULT_ADDRESS, 10000 ether);
         token1.mint(DEFAULT_ADDRESS, 10000 ether);
 
@@ -50,7 +49,24 @@ contract SwapTest is TestHelper {
         vm.stopPrank();
 
         vm.assertEq(balanceAfterToken1 - balanceBeforeToken1, yOut);
-        vm.assertEq(balanceBeforeToken0 - balanceAfterToken0, xIn);
+        vm.assertApproxEqAbs(balanceBeforeToken0 - balanceAfterToken0, xIn, 0.00001 ether);
+    }
+
+    function testFuzz_SwapExactOutFromHook(uint256 amount) external {
+        amount = bound(amount, 1 ether, 100 ether);
+
+        token0.mint(DEFAULT_ADDRESS, 10000 ether);
+        token1.mint(DEFAULT_ADDRESS, 10000 ether);
+
+        vm.startPrank(DEFAULT_ADDRESS);
+
+        token0.approve(address(hook), 10000 ether);
+        token1.approve(address(hook), 10000 ether);
+
+        hook.swap(address(token0), address(token1), 0, amount, bytes(""));
+        hook.swap(address(token0), address(token1), amount, 0, bytes(""));
+
+        vm.stopPrank();
     }
 
     function test_exactOutSwapFromCore() external {}

@@ -20,7 +20,7 @@ import "./lib/SwapMath.sol";
 import "Depeg-swap/contracts/interfaces/IExpiry.sol";
 import "./interfaces/CorkSwapCallback.sol";
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
-import "./Forwarder.sol";
+import {HookForwarder} from "./Forwarder.sol";
 import "./Constants.sol";
 import "v4-periphery/lib/v4-core/src/types/BeforeSwapDelta.sol";
 import "./lib/SenderSlot.sol";
@@ -34,6 +34,8 @@ contract CorkHook is BaseHook, Ownable {
     using PoolStateLibrary for PoolState;
     using PoolIdLibrary for PoolKey;
     using CurrencySettler for Currency;
+
+    uint256 public constant AMOUNT_IN_EXTRA_WORKAROUND = 11000;
 
     error DisableNativeLiquidityModification();
 
@@ -124,40 +126,50 @@ contract CorkHook is BaseHook, Ownable {
         }
     }
 
+    // we default to exaact out swap, since it's easier to do flash swap this way
     function swap(address ra, address ct, uint256 amountRaOut, uint256 amountCtOut, bytes calldata data)
         external
         onlyInitialized(ra, ct)
+        returns (uint256 amountIn)
     {
-        (address token0, address token1, uint256 amount0, uint256 amount1) = sort(ra, ct, amountRaOut, amountCtOut);
+        SortResult memory sortResult = sortPacked(ra, ct, amountRaOut, amountCtOut);
+        _ensureValidAmount(sortResult.amount0, sortResult.amount1);
 
-        // all sanitiy check should go here
-        _ensureValidAmount(amount0, amount1);
-
-        IPoolManager.SwapParams memory ammSwapParams;
+        // if the amount1 is zero, then we swap token0 to token1, and vice versa
+        bool zeroForOne = sortResult.amount0 <= 0;
+        uint256 out = zeroForOne ? sortResult.amount1 : sortResult.amount0;
 
         {
-            bool zeroForOne = amount0 > 0;
-            uint256 out = zeroForOne ? amount0 : amount1;
-
-            ammSwapParams = IPoolManager.SwapParams(zeroForOne, int256(out), Constants.SQRT_PRICE_1_1 + 1);
+            PoolState storage self = pool[toAmmId(sortResult.token0, sortResult.token1)];
+            amountIn = _getAmountIn(self, zeroForOne, out);
         }
+        // all sanitiy check should go here
 
-        PoolKey memory key = getPoolKey(token0, token1);
-        SwapParams memory params = SwapParams(data, ammSwapParams, key);
+        bytes memory swapData;
+        IPoolManager.SwapParams memory ammSwapParams;
+        ammSwapParams = IPoolManager.SwapParams(zeroForOne, int256(out), Constants.SQRT_PRICE_1_1);
 
-        bytes memory swapData = abi.encode(Action.Swap, params);
+        SwapParams memory params;
+        PoolKey memory key = getPoolKey(sortResult.token0, sortResult.token1);
 
-        // set user in sender slot
-        SenderSlot.setSender(msg.sender);
+        params = SwapParams(data, ammSwapParams, key, msg.sender, out, amountIn);
+        swapData = abi.encode(Action.Swap, params);
 
         poolManager.unlock(swapData);
-
-        // clear sender slot
-        SenderSlot.clearSender();
     }
 
     function _initSwap(SwapParams memory params) internal {
-        forwarder.swap(params.poolKey, params.params, params.swapData);
+        // trf user token to forwarder
+        address token0 = Currency.unwrap(params.poolKey.currency0);
+        address token1 = Currency.unwrap(params.poolKey.currency1);
+
+        if (params.params.zeroForOne) {
+            IERC20(token0).transferFrom(params.sender, address(forwarder), params.amountIn + AMOUNT_IN_EXTRA_WORKAROUND);
+        } else {
+            IERC20(token1).transferFrom(params.sender, address(forwarder), params.amountIn + AMOUNT_IN_EXTRA_WORKAROUND);
+        }
+
+        forwarder.swap(params);
     }
 
     function _addLiquidity(PoolState storage self, uint256 amount0, uint256 amount1, address sender) internal {
@@ -307,13 +319,10 @@ contract CorkHook is BaseHook, Ownable {
         IPoolManager.SwapParams calldata params,
         bytes calldata hookData,
         address sender
-    ) internal returns (uint256 amountOut) {
-        // load sender from slot or from
-        sender = SenderSlot.sender() == address(0) ? sender : SenderSlot.sender();
-
+    ) internal returns (uint256 unspecificiedAmount) {
         bool exactIn = (params.amountSpecified < 0);
         uint256 amountIn;
-        amountOut;
+        uint256 amountOut;
 
         // we calculate how much they must pay
         if (exactIn) {
@@ -324,6 +333,8 @@ contract CorkHook is BaseHook, Ownable {
             amountIn = _getAmountIn(self, params.zeroForOne, amountOut);
             (params.zeroForOne, amountOut);
         }
+
+        unspecificiedAmount = exactIn ? amountOut : amountIn;
 
         (Currency input, Currency output) = _getInputOutput(self, params.zeroForOne);
 
@@ -336,22 +347,25 @@ contract CorkHook is BaseHook, Ownable {
         // update reserve
         self.updateReserves(Currency.unwrap(output), amountOut, true);
 
-        // we transfer their tokens
+        // we transfer their tokens, i.e we settle the output token first so that the user can take the input token
         output.settle(poolManager, address(this), amountOut, true);
-        // output.take(poolManager, sender, amountOut, false);
 
         // there is data, means flash swap
         if (hookData.length > 0) {
             // avoid stack too deep
-            _executeFlashSwap(self, hookData, input, output, amountIn, amountOut, sender);
+            forwarder.forwardToken(input, output, amountIn, amountOut);
+            // will 0 if user pay with the same token
+            unspecificiedAmount = _executeFlashSwap(self, hookData, input, output, amountIn, amountOut, sender, exactIn);
             // no data, means normal swap
         } else {
             // update reserve
             self.updateReserves(Currency.unwrap(input), amountIn, false);
 
-            // settle swap
-            // input.settle(poolManager, sender, amountIn, false);
-            // input.take(poolManager, sender, amountIn, true);
+            // settle swap, i.e we take the input token from the pool manager, the debt will be payed by the user
+            input.take(poolManager, sender, amountIn, false);
+
+            // forward token to user if caller is forwarder
+            forwarder.forwardToken(input, output, amountIn, amountOut);
         }
 
         (uint256 kAfter,) = _kWithFee(self, amountIn, input);
@@ -397,32 +411,42 @@ contract CorkHook is BaseHook, Ownable {
         Currency output,
         uint256 amountIn,
         uint256 amountOut,
-        address sender
-    ) internal {
+        address sender,
+        bool exactIn
+    ) internal returns (uint256 unspecificiedAmount) {
         // infer what token would be used for payment, if counterPayment is true, then the input token is used for payment, otherwise its the output token
         bool counterPayment = abi.decode(hookData, (bool));
-        // we expect user to use exact output swap when dealing with flash swap
-        // so we use amountOut as the payment amount cause they simply have to return the borrowed amount
-        // or it's the in amount that they have to pay with the other token
-        (uint256 paymentAmount, address paymentToken) =
-            counterPayment ? (amountIn, Currency.unwrap(input)) : (amountOut, Currency.unwrap(output));
 
-        // call the callback
-        CorkSwapCallback(sender).CorkCall(sender, hookData, paymentAmount, paymentToken);
+        {
+            // we expect user to use exact output swap when dealing with flash swap
+            // so we use amountOut as the payment amount cause they simply have to return the borrowed amount
+            // or it's the in amount that they have to pay with the other token
+            (uint256 paymentAmount, address paymentToken) =
+                counterPayment ? (amountIn, Currency.unwrap(input)) : (amountOut, Currency.unwrap(output));
+
+            // call the callback
+            CorkSwapCallback(sender).CorkCall(sender, hookData, paymentAmount, paymentToken, address(poolManager));
+        }
 
         // process repayments
         if (counterPayment) {
             // update reserve
             self.updateReserves(Currency.unwrap(input), amountIn, false);
 
-            input.settle(poolManager, sender, amountIn, true);
-            input.take(poolManager, address(this), amountIn, false);
+            // settle swap, i.e we take the input token from the pool manager, the debt will be payed by the user, at this point, the user should've created a debit on the PM
+            input.take(poolManager, sender, amountIn, false);
+
+            // this is similar to normal swap, the unspecified amount is the other tokens
+            unspecificiedAmount = exactIn ? amountOut : amountIn;
         } else {
             // update reserve
             self.updateReserves(Currency.unwrap(output), amountOut, false);
 
-            output.settle(poolManager, sender, amountOut, true);
-            output.take(poolManager, address(this), amountOut, false);
+            // we take the original borrowed tokens from the pool manager, at this point the hook should still have the original debit outstanding on the PM
+            output.take(poolManager, sender, amountOut, false);
+
+            // no swap actually occured, the user has paid their balance
+            unspecificiedAmount = 0;
         }
     }
 
@@ -439,7 +463,8 @@ contract CorkHook is BaseHook, Ownable {
 
         (uint256 invariant, uint256 oneMinusT) = _k(self);
         // TODO : workaround for now, if not for this then the k will decrease slightly than we expected
-        amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, invariant, oneMinusT, self.fee) + 11000;
+        amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, invariant, oneMinusT, self.fee)
+            + AMOUNT_IN_EXTRA_WORKAROUND;
     }
 
     function _getAmountOut(PoolState storage self, bool zeroForOne, uint256 amountIn)
