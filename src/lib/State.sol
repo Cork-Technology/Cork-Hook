@@ -58,8 +58,7 @@ library PoolStateLibrary {
         } else if (token == state.token1 && state.reserve1 < amountOut) {
             revert("Not enough liquidity");
         } else {
-            // TODO : move to interface
-            revert("Token not in pool");
+            return;
         }
     }
 

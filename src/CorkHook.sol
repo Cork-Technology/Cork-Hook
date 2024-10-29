@@ -20,8 +20,10 @@ import "./lib/SwapMath.sol";
 import "./interfaces/CorkAsset.sol";
 import "./interfaces/CorkSwapCallback.sol";
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
-import "./Initializer.sol";
+import "./Forwarder.sol";
 import "./Constants.sol";
+import "v4-periphery/lib/v4-core/src/types/BeforeSwapDelta.sol";
+import "./lib/SenderSlot.sol";
 
 // TODO : create interface, events, and move errors
 // TODO : use id instead of tokens address
@@ -44,11 +46,11 @@ contract CorkHook is BaseHook, Ownable {
 
     // we will deploy proxy to this address for each pool
     address lpBase;
-    PoolInitializer initializer;
+    HookForwarder forwarder;
 
     constructor(IPoolManager _poolManager, LiquidityToken _lpBase) BaseHook(_poolManager) Ownable(msg.sender) {
         lpBase = address(_lpBase);
-        initializer = new PoolInitializer(_poolManager);
+        forwarder = new HookForwarder(_poolManager);
     }
 
     modifier onlyInitialized(address a, address b) {
@@ -73,7 +75,7 @@ contract CorkHook is BaseHook, Ownable {
             afterSwap: false,
             beforeDonate: false,
             afterDonate: false,
-            beforeSwapReturnDelta: false,
+            beforeSwapReturnDelta: true, // override, use our price curve
             afterSwapReturnDelta: false,
             afterAddLiquidityReturnDelta: false,
             afterRemoveLiquidityReturnDelta: false
@@ -119,22 +121,35 @@ contract CorkHook is BaseHook, Ownable {
         (address token0, address token1, uint256 amount0, uint256 amount1) = sort(ra, ct, amountRaOut, amountCtOut);
 
         // all sanitiy check should go here
-        if (amount0 >= 0 || amount1 >= 0) {
-            revert("Invalid amount");
+        if (amount0 == 0 && amount1 == 0) {
+            revert("Invalid Amount");
         }
 
-        IPoolManager.SwapParams memory ammSwapParams =
-            IPoolManager.SwapParams(amount0 > 0, -int256(amount0), Constants.SQRT_PRICE_1_1);
+        IPoolManager.SwapParams memory ammSwapParams;
+
+        {
+            bool zeroForOne = amount0 > 0;
+            uint256 out = zeroForOne ? amount0 : amount1;
+
+            ammSwapParams = IPoolManager.SwapParams(zeroForOne, int256(out), Constants.SQRT_PRICE_1_1 + 1);
+        }
+
         PoolKey memory key = getPoolKey(token0, token1);
         SwapParams memory params = SwapParams(data, ammSwapParams, key);
 
         bytes memory swapData = abi.encode(Action.Swap, params);
 
+        // set user in sender slot
+        SenderSlot.setSender(msg.sender);
+
         poolManager.unlock(swapData);
+
+        // clear sender slot
+        SenderSlot.clearSender();
     }
 
     function _initSwap(SwapParams memory params) internal {
-        poolManager.swap(params.poolKey, params.params, params.swapData);
+        forwarder.swap(params.poolKey, params.params, params.swapData);
     }
 
     function _addLiquidity(PoolState storage self, uint256 amount0, uint256 amount1, address sender) internal {
@@ -184,7 +199,7 @@ contract CorkHook is BaseHook, Ownable {
         // all sanitiy check should go here
         // TODO : auto-initialize pool if not initialized
         if (!pool[toAmmId(token0, token1)].isInitialized()) {
-            initializer.initializePool(token0, token1);
+            forwarder.initializePool(token0, token1);
         }
 
         // retruns how much liquidity token was minted
@@ -244,7 +259,7 @@ contract CorkHook is BaseHook, Ownable {
             return "";
         }
 
-        if(action == Action.Swap) {
+        if (action == Action.Swap) {
             (, SwapParams memory params) = abi.decode(data, (Action, SwapParams));
 
             _initSwap(params);
@@ -266,33 +281,38 @@ contract CorkHook is BaseHook, Ownable {
         PoolKey calldata key,
         IPoolManager.SwapParams calldata params,
         bytes calldata hookData
-    ) external override returns (bytes4, BeforeSwapDelta, uint24) {
+    ) external override returns (bytes4, BeforeSwapDelta delta, uint24) {
         PoolState storage self = pool[toAmmId(Currency.unwrap(key.currency0), Currency.unwrap(key.currency1))];
-        _beforeSwap(self, params.amountSpecified, params.zeroForOne, hookData, sender);
+        // kinda packed, avoid stack too deep
+        delta =
+            toBeforeSwapDelta(-int128(params.amountSpecified), -int128(uint128(_beforeSwap(self, params, hookData))));
+
+        // TODO: do we really need to specify the fee here?
+        return (this.beforeSwap.selector, delta, 0);
     }
 
-    function _beforeSwap(
-        PoolState storage self,
-        int256 amountSpecified,
-        bool zeroForOne,
-        bytes calldata hookData,
-        address sender
-    ) internal {
-        bool exactIn = (amountSpecified < 0);
+    function _beforeSwap(PoolState storage self, IPoolManager.SwapParams calldata params, bytes calldata hookData)
+        internal
+        returns (uint256 amountOut)
+    {
+        // load sender from slot
+        address sender = SenderSlot.sender();
+
+        bool exactIn = (params.amountSpecified < 0);
         uint256 amountIn;
-        uint256 amountOut;
+        amountOut;
 
         // we calculate how much they must pay
         if (exactIn) {
-            amountIn = uint256(-amountSpecified);
-            amountOut = _getAmountOut(self, zeroForOne, amountIn);
+            amountIn = uint256(-params.amountSpecified);
+            amountOut = _getAmountOut(self, params.zeroForOne, amountIn);
         } else {
-            amountOut = uint256(amountSpecified);
-            amountIn = _getAmountIn(self, zeroForOne, amountOut);
-            (zeroForOne, amountOut);
+            amountOut = uint256(params.amountSpecified);
+            amountIn = _getAmountIn(self, params.zeroForOne, amountOut);
+            (params.zeroForOne, amountOut);
         }
 
-        (Currency input, Currency output) = _getInputOutput(self, zeroForOne);
+        (Currency input, Currency output) = _getInputOutput(self, params.zeroForOne);
 
         (uint256 kBefore,) = _k(self);
 

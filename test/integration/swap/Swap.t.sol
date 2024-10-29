@@ -19,9 +19,24 @@ contract SwapTest is TestHelper {
         thenAddLiquidity(xReserve, yReserve);
     }
 
-    function test_exactInSwap() external {
-        hook.swap(address(token0), address(token1), xIn, 0, bytes(""));
+    function test_exactInSwap() external {}
+
+    function test_exactOutSwapFromHook() external {
+        vm.startPrank(DEFAULT_ADDRESS);
+        
+        uint256 balanceBeforeToken1 = token1.balanceOf(DEFAULT_ADDRESS);
+        uint256 balanceBeforeToken0 = token0.balanceOf(DEFAULT_ADDRESS);
+
+        hook.swap(address(token0), address(token1), 0, yOut, bytes(""));
+
+        uint256 balanceAfterToken1 = token1.balanceOf(DEFAULT_ADDRESS);
+        uint256 balanceAfterToken0 = token0.balanceOf(DEFAULT_ADDRESS);
+
+        vm.stopPrank();
+
+        vm.assertEq(balanceAfterToken1 - balanceBeforeToken1, yOut);
+        vm.assertEq(balanceBeforeToken0 - balanceAfterToken0, xIn);
     }
 
-    function test_exactOutSwap() external {}
+    function test_exactOutSwapFromCore() external {}
 }

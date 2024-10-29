@@ -12,6 +12,7 @@ import "forge-std/mocks/MockERC20.sol";
 import "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
 import {CorkHook, LiquidityToken, AmmId, PoolState} from "./../src/CorkHook.sol";
 import {TestCorkHook} from "./TestCorkHook.sol";
+import "./../src/interfaces/CorkAsset.sol";
 
 contract TestHelper is Test, Deployers {
     IPoolManager poolManager;
@@ -24,7 +25,7 @@ contract TestHelper is Test, Deployers {
 
     uint160 flags = uint160(
         Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
-            | Hooks.BEFORE_SWAP_FLAG
+            | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
     );
 
     address DEFAULT_ADDRESS = address(69);
@@ -75,7 +76,14 @@ contract TestHelper is Test, Deployers {
     }
 }
 
-contract DummyErc20 is MockERC20 {
+contract DummyErc20 is MockERC20, IExpiry {
+    
+    
+    function isExpired() external view override returns (bool) {
+        return false;
+    }
+
+
     function mint(address to, uint256 amount) public {
         _mint(to, amount);
     }

@@ -28,5 +28,4 @@ struct SwapParams{
     bytes swapData;
     IPoolManager.SwapParams params;
     PoolKey poolKey;
-
 }

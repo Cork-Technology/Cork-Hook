@@ -7,8 +7,8 @@ import "v4-periphery/lib/v4-core/src/interfaces/IPoolManager.sol";
 import "./Constants.sol";
 
 /// @title PoolInitializer
-/// workaround contract to auto initialize pool when adding liquidity since uni v4 doesn't support self calling from hook
-contract PoolInitializer is Ownable {
+/// workaround contract to auto initialize pool & swap when adding liquidity since uni v4 doesn't support self calling from hook
+contract HookForwarder is Ownable {
 
     IPoolManager poolmanager;
 
@@ -21,5 +21,9 @@ contract PoolInitializer is Ownable {
             PoolKey(Currency.wrap(address(token0)), Currency.wrap(address(token1)), Constants.FEE, Constants.TICK_SPACING, IHooks(owner()));
 
         poolmanager.initialize(key, Constants.SQRT_PRICE_1_1);
+    }
+
+    function swap(PoolKey memory key, IPoolManager.SwapParams memory params, bytes calldata data) external onlyOwner {
+        poolmanager.swap(key, params, data);
     }
 }
