@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-import "openzeppelin-contracts/contracts/utils/math/Math.sol";
+pragma solidity 0.8.26;
+
+import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 library LiquidityMath {
     // Adding Liquidity (Pure Function)
@@ -67,5 +68,4 @@ library LiquidityMath {
 
         return (amount0, amount1, newReserve0, newReserve1);
     }
-
 }
