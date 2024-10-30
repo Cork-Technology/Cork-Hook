@@ -92,7 +92,7 @@ contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
         poolManager.sync(Currency.wrap(paymentToken));
 
         CorkSwapCallback(sender).CorkCall(sender, data, paymentAmount, paymentToken, pm);
-        
+
         poolManager.settle();
     }
 }

@@ -15,7 +15,7 @@ library SwapMath {
         uint256 _1MinT,
         uint256 baseFee
     ) internal pure returns (uint256 amountOut) {
-       // Calculate fee factor = baseFee x t in percentage, we complement _1MinT to get t
+        // Calculate fee factor = baseFee x t in percentage, we complement _1MinT to get t
         // the end result should be total fee that we must take out
         uint256 feeFactor = baseFee.mulDown(_1MinT.complement());
         uint256 fee = calculatePercentage(amountIn, feeFactor);
@@ -53,7 +53,7 @@ library SwapMath {
         uint256 reserveInExp = LogExpMath.pow(reserveIn, _1MinT);
 
         uint256 reserveOutExp = LogExpMath.pow(reserveOut, _1MinT);
-        
+
         uint256 k = reserveInExp.add(reserveOutExp);
 
         assert(k >= kInitial);
@@ -83,7 +83,7 @@ library SwapMath {
         uint256 totalDuration = maturityTime.sub(startTime);
 
         // we return 0 in case it's past maturity time
-        if(elapsedTime >= totalDuration){
+        if (elapsedTime >= totalDuration) {
             return 0;
         }
 

@@ -1,4 +1,5 @@
 pragma solidity ^0.8.0;
+
 import "v4-periphery/lib/v4-core/src/interfaces/IPoolManager.sol";
 import "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
 
@@ -23,7 +24,7 @@ struct RemoveLiquidtyParams {
     address sender;
 }
 
-struct SwapParams{
+struct SwapParams {
     // for flashswap
     bytes swapData;
     IPoolManager.SwapParams params;

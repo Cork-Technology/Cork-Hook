@@ -23,7 +23,7 @@ interface IErrors {
     error InvalidAmount();
 
     /// @notice somehow the sender is not set in the forwarder contract when using hook swap function
-    error NoSender();  
+    error NoSender();
 
     /// @notice only self call is allowed when forwarding callback in hook forwarder
     error OnlySelfCall();
@@ -37,5 +37,4 @@ interface IErrors {
     /// @notice trying to add liquidity with insufficient amount
 
     error Insufficient1Amount();
-
 }
