@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity ^0.8.0;
 
-import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
+import "openzeppelin-contracts/contracts/utils/math/Math.sol";
+import "./../interfaces/IErrors.sol";
 
 library LiquidityMath {
     // Adding Liquidity (Pure Function)
@@ -21,7 +22,9 @@ library LiquidityMath {
         )
     {
         // Ensure the added amounts are proportional
-        require(amount0 * reserve1 == amount1 * reserve0, "Non-proportional liquidity");
+        if (amount0 * reserve1 != amount1 * reserve0) {
+            revert IErrors.InvalidAmount();
+        }
 
         // Calculate the liquidity tokens minted based on the added amounts and the current reserves
         if (totalLiquidity == 0) {
@@ -55,8 +58,13 @@ library LiquidityMath {
             uint256 newReserve1 // Updated reserve of CT
         )
     {
-        require(liquidityAmount > 0, "Invalid liquidity amount");
-        require(totalLiquidity > 0, "No liquidity available");
+        if (liquidityAmount <= 0) {
+            revert IErrors.InvalidAmount();
+        }
+
+        if (totalLiquidity <= 0) {
+            revert IErrors.NotEnoughLiquidity();
+        }
 
         // Calculate the proportion of reserves to return based on the liquidity removed
         amount0 = (liquidityAmount * reserve0) / totalLiquidity;

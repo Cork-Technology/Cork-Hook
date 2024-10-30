@@ -11,10 +11,11 @@ import "./lib/Calls.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import "./interfaces/CorkSwapCallback.sol";
 import "./lib/SenderSlot.sol";
+import "./interfaces/IErrors.sol";
 
 /// @title PoolInitializer
 /// workaround contract to auto initialize pool & swap when adding liquidity since uni v4 doesn't support self calling from hook
-contract HookForwarder is Ownable, CorkSwapCallback {
+contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
     using CurrencyLibrary for Currency;
 
     IPoolManager poolManager;
@@ -68,22 +69,21 @@ contract HookForwarder is Ownable, CorkSwapCallback {
         address to = SenderSlot.get();
 
         if (to == address(0)) {
-            // TODO : move to interface
-            revert("HookForwarder: no sender set");
+            revert IErrors.NoSender();
         }
 
         CurrencySettler.take(out, poolManager, to, amountOut, false);
         CurrencySettler.settle(_in, poolManager, address(this), amountIn, false);
     }
 
+    /// @notice we're just forwarding the call to the callback contract
     function CorkCall(address sender, bytes calldata data, uint256 paymentAmount, address paymentToken, address pm)
         external
         onlyOwner
         clearSenderAfter
     {
         if (sender != address(this)) {
-            // TODO : move to interface
-            revert("HookForwarder: only this contract can call this function");
+            revert IErrors.OnlySelfCall();
         }
 
         // we set the sender to the original sender.
