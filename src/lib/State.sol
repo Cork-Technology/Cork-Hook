@@ -4,6 +4,7 @@ import "./LiquidityMath.sol";
 import "./../LiquidityToken.sol";
 import "v4-periphery/lib/v4-core/src/types/Currency.sol";
 import "./balancers/FixedPoint.sol";
+import "./../interfaces/IErrors.sol";
 
 /// @notice amm id,
 type AmmId is bytes32;
@@ -25,7 +26,6 @@ struct SortResult {
     address token1;
     uint256 amount0;
     uint256 amount1;
-
 }
 
 function sort(address a, address b) pure returns (address, address) {
@@ -46,14 +46,12 @@ function sort(address a, address b, uint256 amountA, uint256 amountB)
     return a < b ? (a, b, amountA, amountB) : (b, a, amountB, amountA);
 }
 
-function sortPacked(address a, address b, uint256 amountA, uint256 amountB)
-    pure
-    returns (SortResult memory)
-{
+function sortPacked(address a, address b, uint256 amountA, uint256 amountB) pure returns (SortResult memory) {
     (address token0, address token1, uint256 amount0, uint256 amount1) = sort(a, b, amountA, amountB);
 
     return SortResult(token0, token1, amount0, amount1);
 }
+
 struct PoolState {
     uint256 reserve0;
     uint256 reserve1;
@@ -70,9 +68,9 @@ library PoolStateLibrary {
 
     function ensureLiquidityEnough(PoolState storage state, uint256 amountOut, address token) internal view {
         if (token == state.token0 && state.reserve0 < amountOut) {
-            revert("Not enough liquidity");
+            revert IErrors.NotEnoughLiquidity();
         } else if (token == state.token1 && state.reserve1 < amountOut) {
-            revert("Not enough liquidity");
+            revert IErrors.NotEnoughLiquidity();
         } else {
             return;
         }
@@ -84,14 +82,15 @@ library PoolStateLibrary {
         } else if (token == state.token1) {
             state.reserve1 = minus ? state.reserve1 - amount : state.reserve1 + amount;
         } else {
-            // TODO : move to interface
-            revert("Token not in pool");
+            revert IErrors.InvalidToken();
         }
     }
 
     function updateFee(PoolState storage state, uint256 fee) internal {
-        // TODO : move to interface
-        require(fee <= MAX_FEE, "Fee too high");
+        if (fee >= MAX_FEE) {
+            revert IErrors.InvalidFee();
+        }
+
         state.fee = fee;
     }
 
