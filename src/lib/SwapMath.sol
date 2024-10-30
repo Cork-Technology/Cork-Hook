@@ -82,7 +82,10 @@ library SwapMath {
         uint256 elapsedTime = currentTime.sub(startTime);
         uint256 totalDuration = maturityTime.sub(startTime);
 
-        require(elapsedTime <= totalDuration, "Past maturity");
+        // we return 1 in case it's past maturity time
+        if(elapsedTime >= totalDuration){
+            return FixedPoint.ONE;
+        }
 
         // Return a normalized time between 0 and 1 (as a percentage in 18 decimals)
         t = elapsedTime.divDown(totalDuration).complement();

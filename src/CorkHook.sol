@@ -23,9 +23,9 @@ import {HookForwarder} from "./Forwarder.sol";
 import "./Constants.sol";
 import "v4-periphery/lib/v4-core/src/types/BeforeSwapDelta.sol";
 import "./lib/SenderSlot.sol";
+import "./interfaces/IErrors.sol";
 
 // TODO : create interface, events, and move errors
-// TODO : use id instead of tokens address
 // TODO : make documentation on how to properly initialize the pool
 // TOD : refactor and move some to state.sol
 contract CorkHook is BaseHook, Ownable {
@@ -35,12 +35,6 @@ contract CorkHook is BaseHook, Ownable {
     using CurrencySettler for Currency;
 
     uint256 public constant AMOUNT_IN_EXTRA_WORKAROUND = 11000;
-
-    error DisableNativeLiquidityModification();
-
-    error AlreadyInitialized();
-
-    error NotInitialized();
 
     /// @notice Pool state
     mapping(AmmId => PoolState) internal pool;
@@ -59,7 +53,7 @@ contract CorkHook is BaseHook, Ownable {
         PoolState storage self = pool[ammId];
 
         if (!self.isInitialized()) {
-            revert NotInitialized();
+            revert IErrors.NotInitialized();
         }
         _;
     }
@@ -89,7 +83,7 @@ contract CorkHook is BaseHook, Ownable {
         override
         returns (bytes4)
     {
-        revert DisableNativeLiquidityModification();
+        revert IErrors.DisableNativeLiquidityModification();
     }
 
     function beforeInitialize(address, PoolKey calldata key, uint160) external virtual override returns (bytes4) {
@@ -99,11 +93,17 @@ contract CorkHook is BaseHook, Ownable {
         AmmId ammId = toAmmId(token0, token1);
 
         if (pool[ammId].isInitialized()) {
-            revert AlreadyInitialized();
+            revert IErrors.AlreadyInitialized();
         }
 
         LiquidityToken lp = LiquidityToken(lpBase.clone());
         pool[ammId].initialize(token0, token1, address(lp));
+
+        // check for the token to be valid, i.e have expiry
+        {
+            PoolState storage self = pool[ammId];
+            _getIssuedAndMaturationTime(self);
+        }
 
         // the reason we just concatenate the addresses instead of their respective symbols is that because this way, we don't need to worry about
         // tokens symbols to have different encoding and other shinanigans. Frontend should parse and display the token symbols accordingly
@@ -117,11 +117,11 @@ contract CorkHook is BaseHook, Ownable {
 
     function _ensureValidAmount(uint256 amount0, uint256 amount1) internal pure {
         if (amount0 == 0 && amount1 == 0) {
-            revert("Invalid Amount");
+            revert IErrors.InvalidAmount();
         }
 
         if (amount0 != 0 && amount1 != 0) {
-            revert("Invalid Amount");
+            revert IErrors.InvalidAmount();
         }
     }
 
@@ -216,7 +216,6 @@ contract CorkHook is BaseHook, Ownable {
         (address token0, address token1, uint256 amount0, uint256 amount1) = sort(ra, ct, raAmount, ctAmount);
 
         // all sanitiy check should go here
-        // TODO : auto-initialize pool if not initialized
         if (!pool[toAmmId(token0, token1)].isInitialized()) {
             forwarder.initializePool(token0, token1);
         }
@@ -246,7 +245,7 @@ contract CorkHook is BaseHook, Ownable {
         PoolState storage self = pool[ammId];
 
         if (!self.isInitialized()) {
-            revert NotInitialized();
+            revert IErrors.NotInitialized();
         }
 
         (uint256 amount0, uint256 amount1,,) = pool[toAmmId(token0, token1)].tryRemoveLiquidity(liquidityAmount);
@@ -266,7 +265,6 @@ contract CorkHook is BaseHook, Ownable {
             (, AddLiquidtyParams memory params) = abi.decode(data, (Action, AddLiquidtyParams));
 
             _addLiquidity(pool[toAmmId(params.token0, params.token1)], params.amount0, params.amount1, params.sender);
-            // TODO : right now the selector return is unused
             return "";
         }
 
@@ -274,7 +272,6 @@ contract CorkHook is BaseHook, Ownable {
             (, RemoveLiquidtyParams memory params) = abi.decode(data, (Action, RemoveLiquidtyParams));
 
             _removeLiquidity(pool[toAmmId(params.token0, params.token1)], params.liquidityAmount, params.sender);
-            // TODO : right now the selector return is unused
             return "";
         }
 
@@ -295,7 +292,6 @@ contract CorkHook is BaseHook, Ownable {
         return (pool[toAmmId(ra, ct)].reserve0, pool[toAmmId(ra, ct)].reserve1);
     }
 
-    // IMPORTANT: ALL SWAP MUST GIVE 11000 WEI EXTRA TO AVOID K DECREASED
     function beforeSwap(
         address sender,
         PoolKey calldata key,
@@ -368,7 +364,9 @@ contract CorkHook is BaseHook, Ownable {
         (uint256 kAfter,) = _kWithFee(self, amountIn, input);
 
         // ensure k isn't less than before
-        require(kAfter >= kBefore, "K_DECREASED");
+        if (kAfter < kBefore) {
+            revert IErrors.K();
+        }
     }
 
     function _kWithFee(PoolState storage self, uint256 amountIn, Currency input)
@@ -452,11 +450,16 @@ contract CorkHook is BaseHook, Ownable {
         view
         returns (uint256 amountIn)
     {
-        require(amountOut > 0, "INSUFFICIENT_OUTPUT_AMOUNT");
+        if (amountOut <= 0) {
+            revert IErrors.InvalidAmount();
+        }
 
         (uint256 reserveIn, uint256 reserveOut) =
             zeroForOne ? (self.reserve0, self.reserve1) : (self.reserve1, self.reserve0);
-        require(reserveIn > 0 && reserveOut > 0, "INSUFFICIENT_LIQUIDITY");
+
+        if (reserveIn <= 0 || reserveOut <= 0) {
+            revert IErrors.NotEnoughLiquidity();
+        }
 
         (uint256 invariant, uint256 oneMinusT) = _k(self);
         // TODO : workaround for now, if not for this then the k will decrease slightly than we expected(only work for 1000 :1050 reserve with 1 swao amount at time of 1-t = 0.1)
@@ -464,19 +467,48 @@ contract CorkHook is BaseHook, Ownable {
             + AMOUNT_IN_EXTRA_WORKAROUND;
     }
 
+    function getAmountIn(address ra, address ct, bool zeroForOne, uint256 amountOut)
+        external
+        view
+        onlyInitialized(ra, ct)
+        returns (uint256 amountIn)
+    {
+        (address token0, address token1) = sort(ra, ct);
+        PoolState storage self = pool[toAmmId(token0, token1)];
+
+        amountIn = _getAmountIn(self, zeroForOne, amountOut);
+    }
+
     function _getAmountOut(PoolState storage self, bool zeroForOne, uint256 amountIn)
         internal
         view
         returns (uint256 amountOut)
     {
-        require(amountIn > 0, "INSUFFICIENT_INPUT_AMOUNT");
+        if (amountIn <= 0) {
+            revert IErrors.InvalidAmount();
+        }
 
         (uint256 reserveIn, uint256 reserveOut) =
             zeroForOne ? (self.reserve0, self.reserve1) : (self.reserve1, self.reserve0);
-        require(reserveIn > 0 && reserveOut > 0, "INSUFFICIENT_LIQUIDITY");
+       
+            if (reserveIn <= 0 || reserveOut <= 0) {
+            revert IErrors.NotEnoughLiquidity();
+        }
 
         (uint256 invariant, uint256 oneMinusT) = _k(self);
         amountOut = SwapMath.getAmountOut(amountIn, reserveIn, reserveOut, invariant, oneMinusT, self.fee);
+    }
+
+    function getAmountOut(address ra, address ct, bool zeroForOne, uint256 amountIn)
+        external
+        view
+        onlyInitialized(ra, ct)
+        returns (uint256 amountOut)
+    {
+        (address token0, address token1) = sort(ra, ct);
+        PoolState storage self = pool[toAmmId(token0, token1)];
+
+        amountOut = _getAmountOut(self, zeroForOne, amountIn);
     }
 
     function _getInputOutput(PoolState storage self, bool zeroForOne)
@@ -504,7 +536,7 @@ contract CorkHook is BaseHook, Ownable {
             return (start, end);
         } catch {}
 
-        revert("Invalid Token Pairs, no expiry found");
+        revert IErrors.InvalidToken();
     }
 
     function _k(PoolState storage self) internal view returns (uint256 invariant, uint256 oneMinusT) {
