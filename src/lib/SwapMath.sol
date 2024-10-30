@@ -2,7 +2,6 @@ pragma solidity ^0.8.0;
 
 import "./balancers/FixedPoint.sol";
 import "./balancers/LogExpMath.sol";
-import "forge-std/console.sol";
 
 library SwapMath {
     using FixedPoint for uint256;
@@ -25,10 +24,8 @@ library SwapMath {
         amountIn = amountIn.sub(fee);
 
         uint256 reserveInExp = LogExpMath.pow(reserveIn, _1MinT);
-        console.log("reserveInExp: ", reserveInExp);
 
         uint256 reserveOutExp = LogExpMath.pow(reserveOut, _1MinT);
-        console.log("reserveOutExp: ", reserveOutExp);
 
         uint256 k = reserveInExp.add(reserveOutExp);
 
@@ -54,10 +51,8 @@ library SwapMath {
         uint256 baseFee
     ) internal pure returns (uint256 amountIn) {
         uint256 reserveInExp = LogExpMath.pow(reserveIn, _1MinT);
-        console.log("reserveInExp: ", reserveInExp);
 
         uint256 reserveOutExp = LogExpMath.pow(reserveOut, _1MinT);
-        console.log("reserveOutExp: ", reserveOutExp);
         
         uint256 k = reserveInExp.add(reserveOutExp);
 

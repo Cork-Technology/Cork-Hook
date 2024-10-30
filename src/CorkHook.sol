@@ -15,7 +15,6 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 import "openzeppelin-contracts/contracts/utils/Strings.sol";
 import "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
 import "./lib/Calls.sol";
-import "forge-std/console.sol";
 import "./lib/SwapMath.sol";
 import "Depeg-swap/contracts/interfaces/IExpiry.sol";
 import "./interfaces/CorkSwapCallback.sol";
@@ -338,8 +337,6 @@ contract CorkHook is BaseHook, Ownable {
 
         (Currency input, Currency output) = _getInputOutput(self, params.zeroForOne);
 
-        console.log("amountIn", amountIn);
-        console.log("amountOut", amountOut);
         (uint256 kBefore,) = _k(self);
 
         self.ensureLiquidityEnough(amountOut, Currency.unwrap(output));
@@ -462,7 +459,7 @@ contract CorkHook is BaseHook, Ownable {
         require(reserveIn > 0 && reserveOut > 0, "INSUFFICIENT_LIQUIDITY");
 
         (uint256 invariant, uint256 oneMinusT) = _k(self);
-        // TODO : workaround for now, if not for this then the k will decrease slightly than we expected
+        // TODO : workaround for now, if not for this then the k will decrease slightly than we expected(only work for 1000 :1050 reserve with 1 swao amount at time of 1-t = 0.1)
         amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, invariant, oneMinusT, self.fee)
             + AMOUNT_IN_EXTRA_WORKAROUND;
     }
