@@ -27,7 +27,8 @@ contract SwapTest is TestHelper {
         return 30 days;
     }
 
-    function test_exactInSwap() external {}
+    // TODO
+    function test_exactInSwapFromCore() external {}
 
     function test_exactOutSwapFromHook() external {
         token0.mint(DEFAULT_ADDRESS, 10000 ether);
@@ -69,5 +70,15 @@ contract SwapTest is TestHelper {
         vm.stopPrank();
     }
 
+
+    // TODO
     function test_exactOutSwapFromCore() external {}
+
+    // TODO
+    function test_FlashSwapFromHookExactOut() external {}
+
+    function test_FlashSwapFromCoreExactIn() external {}
+    
+    function test_FlashSwapFromCoreExactOut() external {}
+
 }
