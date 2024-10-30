@@ -10,9 +10,14 @@ interface ICorkHook is IErrors {
         external
         returns (uint256 amountIn);
 
-    function addLiquidity(address ra, address ct, uint256 raAmount, uint256 ctAmount)
-        external
-        returns (uint256 mintedLp);
+    function addLiquidity(
+        address ra,
+        address ct,
+        uint256 raAmount,
+        uint256 ctAmount,
+        uint256 amountRamin,
+        uint256 amountCtmin
+    ) external returns (uint256 amountRa, uint256 amountCt, uint256 mintedLp);
 
     function removeLiquidity(address ra, address ct, uint256 liquidityAmount)
         external

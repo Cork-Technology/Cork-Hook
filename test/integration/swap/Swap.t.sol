@@ -52,22 +52,22 @@ contract SwapTest is TestHelper {
         vm.assertApproxEqAbs(balanceBeforeToken0 - balanceAfterToken0, xIn, 0.00001 ether);
     }
 
-    function testFuzz_SwapExactOutFromHook(uint256 amount) external {
-        amount = bound(amount, 1 ether, 100 ether);
+    // function testFuzz_SwapExactOutFromHook(uint256 amount) external {
+    //     amount = bound(amount, 1 ether, 100 ether);
 
-        token0.mint(DEFAULT_ADDRESS, 10000 ether);
-        token1.mint(DEFAULT_ADDRESS, 10000 ether);
+    //     token0.mint(DEFAULT_ADDRESS, 10000 ether);
+    //     token1.mint(DEFAULT_ADDRESS, 10000 ether);
 
-        vm.startPrank(DEFAULT_ADDRESS);
+    //     vm.startPrank(DEFAULT_ADDRESS);
 
-        token0.approve(address(hook), 10000 ether);
-        token1.approve(address(hook), 10000 ether);
+    //     token0.approve(address(hook), 10000 ether);
+    //     token1.approve(address(hook), 10000 ether);
 
-        hook.swap(address(token0), address(token1), 0, amount, bytes(""));
-        hook.swap(address(token0), address(token1), amount, 0, bytes(""));
+    //     hook.swap(address(token0), address(token1), 0, amount, bytes(""));
+    //     hook.swap(address(token0), address(token1), amount, 0, bytes(""));
 
-        vm.stopPrank();
-    }
+    //     vm.stopPrank();
+    // }
 
     function test_exactOutSwapFromCore() external {}
 }

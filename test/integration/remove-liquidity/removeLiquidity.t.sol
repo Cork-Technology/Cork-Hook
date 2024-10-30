@@ -25,7 +25,7 @@ contract RemoveLiquidityTest is TestHelper {
         uint256 amount0 = 1000 ether;
         uint256 amount1 = 900 ether;
 
-        uint256 mintedLp = hook.addLiquidity(address(token0), address(token1), amount0, amount1);
+        (,, uint256 mintedLp) = hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
         LiquidityToken lpToken = LiquidityToken(hook.getLiquidityToken(address(token0), address(token1)));
 
         uint256 expectedLpApprox = 948.6832 ether;
@@ -51,7 +51,8 @@ contract RemoveLiquidityTest is TestHelper {
         uint256 amount0 = 1000 ether;
         uint256 amount1 = 900 ether;
 
-        uint256 mintedLp = hook.addLiquidity(address(token0), address(token1), amount0, amount1);
+        (,, uint256 mintedLp) = hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
+
         LiquidityToken lpToken = LiquidityToken(hook.getLiquidityToken(address(token0), address(token1)));
         uint256 expectedLpApprox = 948.6832 ether;
 

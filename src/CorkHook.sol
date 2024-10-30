@@ -176,7 +176,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     }
 
     function _addLiquidity(PoolState storage self, uint256 amount0, uint256 amount1, address sender) internal {
-        self.addLiquidity(amount0, amount1, sender);
+        // we can safely insert 0 here since we have checked for validity at the start
+        self.addLiquidity(amount0, amount1, sender, 0, 0);
 
         Currency token0 = self.getToken0();
         Currency token1 = self.getToken1();
@@ -213,10 +214,14 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         pool[toAmmId(ra, ct)].fee = baseFeePercentage;
     }
 
-    function addLiquidity(address ra, address ct, uint256 raAmount, uint256 ctAmount)
-        external
-        returns (uint256 mintedLp)
-    {
+    function addLiquidity(
+        address ra,
+        address ct,
+        uint256 raAmount,
+        uint256 ctAmount,
+        uint256 amountRamin,
+        uint256 amountCtmin
+    ) external returns (uint256 amountRa, uint256 amountCt, uint256 mintedLp) {
         (address token0, address token1, uint256 amount0, uint256 amount1) = sort(ra, ct, raAmount, ctAmount);
 
         // all sanitiy check should go here
@@ -224,8 +229,15 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             forwarder.initializePool(token0, token1);
         }
 
-        // retruns how much liquidity token was minted
-        (,, mintedLp) = pool[toAmmId(token0, token1)].tryAddLiquidity(amount0, amount1);
+        // returns how much liquidity token was minted
+        {
+            (,, uint256 amount0min, uint256 amount1min) = sort(ra, ct, amountRamin, amountCtmin);
+            // check and returns how much lp minted
+            (,, mintedLp, amountRa, amountCt) =
+                pool[toAmmId(token0, token1)].tryAddLiquidity(amount0, amount1, amount0min, amount1min);
+
+            (amountRa, amountCt) = ra == token0 ? (amountRa, amountCt) : (amountCt, amountRa);
+        }
 
         AddLiquidtyParams memory params = AddLiquidtyParams(token0, amount0, token1, amount1, msg.sender);
 
@@ -494,8 +506,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
         (uint256 reserveIn, uint256 reserveOut) =
             zeroForOne ? (self.reserve0, self.reserve1) : (self.reserve1, self.reserve0);
-       
-            if (reserveIn <= 0 || reserveOut <= 0) {
+
+        if (reserveIn <= 0 || reserveOut <= 0) {
             revert IErrors.NotEnoughLiquidity();
         }
 

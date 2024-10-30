@@ -31,4 +31,11 @@ interface IErrors {
     /// @notice the infamous K, thrown when the trades resulted in the imbalance of the pool
     error K();
 
+    /// @notice trying to add liquidity with insufficient amount
+    error Insufficient0Amount();
+
+    /// @notice trying to add liquidity with insufficient amount
+
+    error Insufficient1Amount();
+
 }

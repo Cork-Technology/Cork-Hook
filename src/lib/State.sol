@@ -112,20 +112,37 @@ library PoolStateLibrary {
         return state.token0 != address(0);
     }
 
-    function tryAddLiquidity(PoolState storage state, uint256 amount0, uint256 amount1)
+    function tryAddLiquidity(
+        PoolState storage state,
+        uint256 amount0,
+        uint256 amount1,
+        uint256 amount0min,
+        uint256 amount1min
+    )
         internal
-        returns (uint256 reserve0, uint256 reserve1, uint256 mintedLp)
+        returns (uint256 reserve0, uint256 reserve1, uint256 mintedLp, uint256 amount0Used, uint256 amount1Used)
     {
+        (amount0Used, amount1Used) =
+            LiquidityMath.inferOptimalAmount(state.reserve0, state.reserve1, amount0, amount1, amount0min, amount1min);
+
         (reserve0, reserve1, mintedLp) = LiquidityMath.addLiquidity(
             state.reserve0, state.reserve1, state.liquidityToken.totalSupply(), amount0, amount1
         );
     }
 
-    function addLiquidity(PoolState storage state, uint256 amount0, uint256 amount1, address sender)
+    function addLiquidity(
+        PoolState storage state,
+        uint256 amount0,
+        uint256 amount1,
+        address sender,
+        uint256 amount0min,
+        uint256 amount1min
+    )
         internal
-        returns (uint256 reserve0, uint256 reserve1, uint256 mintedLp)
+        returns (uint256 reserve0, uint256 reserve1, uint256 mintedLp, uint256 amount0Used, uint256 amount1Used)
     {
-        (reserve0, reserve1, mintedLp) = tryAddLiquidity(state, amount0, amount1);
+        (reserve0, reserve1, mintedLp, amount0Used, amount1Used) =
+            tryAddLiquidity(state, amount0, amount1, amount0min, amount1min);
 
         state.reserve0 = reserve0;
         state.reserve1 = reserve1;

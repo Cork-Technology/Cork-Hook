@@ -25,12 +25,50 @@ contract AddLiquidityTest is TestHelper {
         uint256 amount0 = 1000 ether;
         uint256 amount1 = 900 ether;
 
-        hook.addLiquidity(address(token0), address(token1), amount0, amount1);
+        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
         PoolState memory state = hook.getPoolState(address(token0), address(token1));
 
         vm.assertEq(state.reserve0, amount0);
         vm.assertEq(state.reserve1, amount1);
         vm.assertApproxEqAbs(state.liquidityToken.totalSupply(), 948.6832 ether, 0.0001 ether);
+    }
+
+    function testRevert_unOptimalAmountBasic() public {
+        withInitializedPool();
+        vm.startPrank(DEFAULT_ADDRESS);
+
+        uint256 amount0 = 1000 ether;
+        uint256 amount1 = 2000 ether;
+
+        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
+        PoolState memory state = hook.getPoolState(address(token0), address(token1));
+
+        amount0 = 1 ether;
+        amount1 = 1 ether;
+
+        (uint256 used0, uint256 used1,) = hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
+
+        vm.assertEq(used0, 0.5 ether);
+        vm.assertEq(used1, 1 ether);
+    }
+
+    function test_dustUnOptimalAmountBasic() public {
+        withInitializedPool();
+        vm.startPrank(DEFAULT_ADDRESS);
+
+        uint256 amount0 = 1000 ether;
+        uint256 amount1 = 2000 ether;
+
+        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
+        PoolState memory state = hook.getPoolState(address(token0), address(token1));
+
+        amount0 = 1 ether;
+        amount1 = 3 ether;
+
+        (uint256 used0, uint256 used1,) = hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
+
+        vm.assertEq(used0, 1 ether);
+        vm.assertEq(used1, 2 ether);
     }
 
     function test_AddLiquidityNotInitialized() external {
@@ -39,6 +77,6 @@ contract AddLiquidityTest is TestHelper {
         uint256 amount0 = 1000 ether;
         uint256 amount1 = 900 ether;
 
-        hook.addLiquidity(address(token0), address(token1), amount0, amount1);
+        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
     }
 }
