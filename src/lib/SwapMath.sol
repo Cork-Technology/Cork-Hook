@@ -73,7 +73,7 @@ library SwapMath {
         amountIn = amountIn.sub(fee);
     }
 
-    /// @notice Get normalized time (t) as a value between 0 and 1
+    /// @notice Get normalized time (t) as a value between 1 and 0, it'll approach 0 as time goes on
     function getNormalizedTimeToMaturity(uint256 startTime, uint256 maturityTime, uint256 currentTime)
         public
         pure
@@ -82,9 +82,9 @@ library SwapMath {
         uint256 elapsedTime = currentTime.sub(startTime);
         uint256 totalDuration = maturityTime.sub(startTime);
 
-        // we return 1 in case it's past maturity time
+        // we return 0 in case it's past maturity time
         if(elapsedTime >= totalDuration){
-            return FixedPoint.ONE;
+            return 0;
         }
 
         // Return a normalized time between 0 and 1 (as a percentage in 18 decimals)
