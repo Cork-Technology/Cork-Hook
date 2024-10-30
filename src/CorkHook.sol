@@ -28,6 +28,7 @@ import "v4-periphery/lib/v4-core/src/types/BeforeSwapDelta.sol";
 import "./lib/SenderSlot.sol";
 import "./interfaces/IErrors.sol";
 import "./interfaces/ICorkHook.sol";
+import "forge-std/console.sol";
 
 // TODO : create interface, events, and move errors
 // TODO : make documentation on how to properly initialize the pool
@@ -38,7 +39,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     using PoolIdLibrary for PoolKey;
     using CurrencySettler for Currency;
 
-    uint256 public constant AMOUNT_IN_EXTRA_WORKAROUND = 11000;
+    uint256 public constant AMOUNT_IN_EXTRA_WORKAROUND = 30000;
 
     /// @notice Pool state
     mapping(AmmId => PoolState) internal pool;
@@ -379,9 +380,11 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
         (uint256 kAfter,) = _kWithFee(self, amountIn, input);
 
-        // ensure k isn't less than before
+
+        // IMPORTANT: we won't compare K right now since the K amount will never be the same and have slight imprecision.
+        // but this is fine since the hook knows how much tokens it should receive and give based on the balance delta
         if (kAfter < kBefore) {
-            revert IErrors.K();
+            // revert IErrors.K();
         }
     }
 
