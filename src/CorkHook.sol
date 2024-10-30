@@ -24,11 +24,12 @@ import "./Constants.sol";
 import "v4-periphery/lib/v4-core/src/types/BeforeSwapDelta.sol";
 import "./lib/SenderSlot.sol";
 import "./interfaces/IErrors.sol";
+import "./interfaces/ICorkHook.sol";
 
 // TODO : create interface, events, and move errors
 // TODO : make documentation on how to properly initialize the pool
 // TOD : refactor and move some to state.sol
-contract CorkHook is BaseHook, Ownable {
+contract CorkHook is BaseHook, Ownable, ICorkHook {
     using Clones for address;
     using PoolStateLibrary for PoolState;
     using PoolIdLibrary for PoolKey;
