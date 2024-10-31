@@ -25,7 +25,7 @@ contract AddLiquidityTest is TestHelper {
         uint256 amount0 = 1000 ether;
         uint256 amount1 = 900 ether;
 
-        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
+        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0, block.timestamp);
         PoolState memory state = hook.getPoolState(address(token0), address(token1));
 
         vm.assertEq(state.reserve0, amount0);
@@ -40,13 +40,14 @@ contract AddLiquidityTest is TestHelper {
         uint256 amount0 = 1000 ether;
         uint256 amount1 = 2000 ether;
 
-        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
+        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0, block.timestamp);
         PoolState memory state = hook.getPoolState(address(token0), address(token1));
 
         amount0 = 1 ether;
         amount1 = 1 ether;
 
-        (uint256 used0, uint256 used1,) = hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
+        (uint256 used0, uint256 used1,) =
+            hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0, block.timestamp);
 
         vm.assertEq(used0, 0.5 ether);
         vm.assertEq(used1, 1 ether);
@@ -59,13 +60,14 @@ contract AddLiquidityTest is TestHelper {
         uint256 amount0 = 1000 ether;
         uint256 amount1 = 2000 ether;
 
-        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
+        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0, block.timestamp);
         PoolState memory state = hook.getPoolState(address(token0), address(token1));
 
         amount0 = 1 ether;
         amount1 = 3 ether;
 
-        (uint256 used0, uint256 used1,) = hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
+        (uint256 used0, uint256 used1,) =
+            hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0, block.timestamp);
 
         vm.assertEq(used0, 1 ether);
         vm.assertEq(used1, 2 ether);
@@ -77,6 +79,17 @@ contract AddLiquidityTest is TestHelper {
         uint256 amount0 = 1000 ether;
         uint256 amount1 = 900 ether;
 
-        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
+        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0, block.timestamp);
+    }
+
+    function testRevert_notWithinDeadline() external {
+        withInitializedPool();
+        vm.startPrank(DEFAULT_ADDRESS);
+
+        uint256 amount0 = 1000 ether;
+        uint256 amount1 = 900 ether;
+
+        vm.expectRevert();
+        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0, block.timestamp - 1);
     }
 }

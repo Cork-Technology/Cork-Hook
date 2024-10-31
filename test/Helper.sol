@@ -72,7 +72,7 @@ contract TestHelper is Test, Deployers {
         token0.approve(address(hook), amount0);
         token1.approve(address(hook), amount1);
 
-        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0);
+        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0, block.timestamp);
         vm.stopPrank();
     }
 }

@@ -35,6 +35,8 @@ interface IErrors {
     error Insufficient0Amount();
 
     /// @notice trying to add liquidity with insufficient amount
-
     error Insufficient1Amount();
+
+    /// @notice deadline has passed
+    error Deadline();
 }

@@ -30,16 +30,13 @@ import "./interfaces/IErrors.sol";
 import "./interfaces/ICorkHook.sol";
 import "forge-std/console.sol";
 
-// TODO : create interface, events, and move errors
 // TODO : make documentation on how to properly initialize the pool
-// TOD : refactor and move some to state.sol
+// TODO : implement fee properly without checking K
 contract CorkHook is BaseHook, Ownable, ICorkHook {
     using Clones for address;
     using PoolStateLibrary for PoolState;
     using PoolIdLibrary for PoolKey;
     using CurrencySettler for Currency;
-
-    uint256 public constant AMOUNT_IN_EXTRA_WORKAROUND = 30000;
 
     /// @notice Pool state
     mapping(AmmId => PoolState) internal pool;
@@ -59,6 +56,13 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
         if (!self.isInitialized()) {
             revert IErrors.NotInitialized();
+        }
+        _;
+    }
+
+    modifier withinDeadline(uint256 deadline) {
+        if (deadline < block.timestamp) {
+            revert IErrors.Deadline();
         }
         _;
     }
@@ -168,9 +172,9 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         address token1 = Currency.unwrap(params.poolKey.currency1);
 
         if (params.params.zeroForOne) {
-            IERC20(token0).transferFrom(params.sender, address(forwarder), params.amountIn + AMOUNT_IN_EXTRA_WORKAROUND);
+            IERC20(token0).transferFrom(params.sender, address(forwarder), params.amountIn);
         } else {
-            IERC20(token1).transferFrom(params.sender, address(forwarder), params.amountIn + AMOUNT_IN_EXTRA_WORKAROUND);
+            IERC20(token1).transferFrom(params.sender, address(forwarder), params.amountIn);
         }
 
         forwarder.swap(params);
@@ -221,30 +225,36 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         uint256 raAmount,
         uint256 ctAmount,
         uint256 amountRamin,
-        uint256 amountCtmin
-    ) external returns (uint256 amountRa, uint256 amountCt, uint256 mintedLp) {
-        (address token0, address token1, uint256 amount0, uint256 amount1) = sort(ra, ct, raAmount, ctAmount);
+        uint256 amountCtmin,
+        uint256 deadline
+    ) external withinDeadline(deadline) returns (uint256 amountRa, uint256 amountCt, uint256 mintedLp) {
+        // returns how much liquidity token was minted
+        SortResult memory sortResult = sortPacked(ra, ct, raAmount, ctAmount);
+
+        PoolState storage self = pool[toAmmId(sortResult.token0, sortResult.token1)];
 
         // all sanitiy check should go here
-        if (!pool[toAmmId(token0, token1)].isInitialized()) {
-            forwarder.initializePool(token0, token1);
+        if (!self.isInitialized()) {
+            forwarder.initializePool(sortResult.token0, sortResult.token1);
         }
 
-        // returns how much liquidity token was minted
         {
             (,, uint256 amount0min, uint256 amount1min) = sort(ra, ct, amountRamin, amountCtmin);
             // check and returns how much lp minted
             (,, mintedLp, amountRa, amountCt) =
-                pool[toAmmId(token0, token1)].tryAddLiquidity(amount0, amount1, amount0min, amount1min);
+                self.tryAddLiquidity(sortResult.amount0, sortResult.amount1, amount0min, amount1min);
 
-            (amountRa, amountCt) = ra == token0 ? (amountRa, amountCt) : (amountCt, amountRa);
+            (amountRa, amountCt) = ra == sortResult.token0 ? (amountRa, amountCt) : (amountCt, amountRa);
         }
 
-        AddLiquidtyParams memory params = AddLiquidtyParams(token0, amount0, token1, amount1, msg.sender);
+        {
+            AddLiquidtyParams memory params = AddLiquidtyParams(
+                sortResult.token0, sortResult.amount0, sortResult.token1, sortResult.amount1, msg.sender
+            );
+            bytes memory data = abi.encode(Action.AddLiquidity, params);
 
-        bytes memory data = abi.encode(Action.AddLiquidity, params);
-
-        poolManager.unlock(data);
+            poolManager.unlock(data);
+        }
     }
 
     function removeLiquidity(address ra, address ct, uint256 liquidityAmount)
@@ -380,7 +390,6 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
         (uint256 kAfter,) = _kWithFee(self, amountIn, input);
 
-
         // IMPORTANT: we won't compare K right now since the K amount will never be the same and have slight imprecision.
         // but this is fine since the hook knows how much tokens it should receive and give based on the balance delta
         if (kAfter < kBefore) {
@@ -482,8 +491,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
         (uint256 invariant, uint256 oneMinusT) = _k(self);
         // TODO : workaround for now, if not for this then the k will decrease slightly than we expected(only work for 1000 :1050 reserve with 1 swao amount at time of 1-t = 0.1)
-        amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, invariant, oneMinusT, self.fee)
-            + AMOUNT_IN_EXTRA_WORKAROUND;
+        amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, invariant, oneMinusT, self.fee);
     }
 
     function getAmountIn(address ra, address ct, bool zeroForOne, uint256 amountOut)
