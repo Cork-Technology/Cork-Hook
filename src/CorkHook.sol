@@ -32,6 +32,8 @@ import "forge-std/console.sol";
 
 // TODO : make documentation on how to properly initialize the pool
 // TODO : implement fee properly without checking K
+// TODO : create events
+// TODO : make it upgradeable
 contract CorkHook is BaseHook, Ownable, ICorkHook {
     using Clones for address;
     using PoolStateLibrary for PoolState;
@@ -316,7 +318,14 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     }
 
     function getReserves(address ra, address ct) external view onlyInitialized(ra, ct) returns (uint256, uint256) {
-        return (pool[toAmmId(ra, ct)].reserve0, pool[toAmmId(ra, ct)].reserve1);
+        uint256 ammId = toAmmId(ra, ct);
+        
+        uint256 reserve0 = pool[ammId].reserve0;
+        uint256 reserve1 = pool[ammId].reserve1;
+
+        // we sort according what user requested
+        return ra < ct ? (reserve0, reserve1) : (reserve1, reserve0);
+        
     }
 
     function beforeSwap(
