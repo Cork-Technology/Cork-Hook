@@ -36,7 +36,13 @@ function reverseSortWithAmount(address a, address b, address token0, address tok
     pure
     returns (address, address, uint256, uint256)
 {
-    return a == token0 ? (token0, token1, amount0, amount1) : (token1, token0, amount1, amount0);
+    if (a == token0 && b == token1) {
+        return (token0, token1, amount0, amount1);
+    } else if (a == token1 && b == token0) {
+        return (token1, token0, amount1, amount0);
+    } else {
+        revert IErrors.InvalidToken();
+    }
 }
 
 function sort(address a, address b, uint256 amountA, uint256 amountB)

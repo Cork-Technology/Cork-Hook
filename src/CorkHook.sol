@@ -266,11 +266,16 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         uint256 amountRamin,
         uint256 amountCtmin,
         uint256 deadline
-    ) external onlyInitialized(ra, ct) withinDeadline(deadline) returns (uint256 amountRa, uint256 amountCt) {
+    ) external withinDeadline(deadline) returns (uint256 amountRa, uint256 amountCt) {
         SortResult memory sortResult = sortPacked(ra, ct);
 
         AmmId ammId = toAmmId(sortResult.token0, sortResult.token1);
         PoolState storage self = pool[ammId];
+
+        // sanity check, we explicitly check here instrad of using modifier to avoid stack too deep
+        if (!self.isInitialized()) {
+            revert IErrors.NotInitialized();
+        }
 
         (uint256 amount0, uint256 amount1,,) = self.tryRemoveLiquidity(liquidityAmount);
         (,, amountRa, amountCt) = reverseSortWithAmount(ra, ct, sortResult.token0, sortResult.token1, amount0, amount1);

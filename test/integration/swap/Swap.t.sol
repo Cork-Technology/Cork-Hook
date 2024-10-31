@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 import "./../../Helper.sol";
 import "./../../../src/Constants.sol";
 
+import "v4-periphery/lib/v4-core/src/test/PoolSwapTest.sol";
+
 contract SwapTest is TestHelper {
     uint256 internal constant xReserve = 1000 ether;
     uint256 internal constant yReserve = 1050 ether;
@@ -70,15 +72,40 @@ contract SwapTest is TestHelper {
         vm.stopPrank();
     }
 
+    function test_exactOutSwapFromCore() external {
+        token0.mint(DEFAULT_ADDRESS, 10000 ether);
+        token1.mint(DEFAULT_ADDRESS, 10000 ether);
 
-    // TODO
-    function test_exactOutSwapFromCore() external {}
+        vm.startPrank(DEFAULT_ADDRESS);
+
+        token0.approve(address(hook), 10000 ether);
+        token1.approve(address(hook), 10000 ether);
+
+        uint256 balanceBeforeToken1 = token1.balanceOf(DEFAULT_ADDRESS);
+        uint256 balanceBeforeToken0 = token0.balanceOf(DEFAULT_ADDRESS);
+
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams(true, int256(yOut), Constants.SQRT_PRICE_1_1);
+        swapRouter.swap(
+            hook.getPoolKey(address(token0), address(token1)),
+            params,
+            PoolSwapTest.TestSettings(false, false),
+            bytes("")
+        );
+        // poolManager.swap(hook.getPoolKey(address(token0), address(token1)), params, bytes(""));
+
+        uint256 balanceAfterToken1 = token1.balanceOf(DEFAULT_ADDRESS);
+        uint256 balanceAfterToken0 = token0.balanceOf(DEFAULT_ADDRESS);
+
+        vm.stopPrank();
+
+        vm.assertEq(balanceAfterToken1 - balanceBeforeToken1, yOut);
+        vm.assertApproxEqAbs(balanceBeforeToken0 - balanceAfterToken0, xIn, 0.00001 ether);
+    }
 
     // TODO
     function test_FlashSwapFromHookExactOut() external {}
 
     function test_FlashSwapFromCoreExactIn() external {}
-    
-    function test_FlashSwapFromCoreExactOut() external {}
 
+    function test_FlashSwapFromCoreExactOut() external {}
 }
