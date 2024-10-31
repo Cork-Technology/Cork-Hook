@@ -318,7 +318,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     }
 
     function getReserves(address ra, address ct) external view onlyInitialized(ra, ct) returns (uint256, uint256) {
-        uint256 ammId = toAmmId(ra, ct);
+        AmmId ammId = toAmmId(ra, ct);
         
         uint256 reserve0 = pool[ammId].reserve0;
         uint256 reserve1 = pool[ammId].reserve1;
