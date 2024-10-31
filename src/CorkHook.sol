@@ -319,13 +319,12 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
     function getReserves(address ra, address ct) external view onlyInitialized(ra, ct) returns (uint256, uint256) {
         AmmId ammId = toAmmId(ra, ct);
-        
+
         uint256 reserve0 = pool[ammId].reserve0;
         uint256 reserve1 = pool[ammId].reserve1;
 
         // we sort according what user requested
         return ra < ct ? (reserve0, reserve1) : (reserve1, reserve0);
-        
     }
 
     function beforeSwap(
@@ -588,5 +587,13 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         return PoolKey(
             Currency.wrap(token0), Currency.wrap(token1), Constants.FEE, Constants.TICK_SPACING, IHooks(address(this))
         );
+    }
+
+    function getPoolManager() external view returns (address) {
+        return address(poolManager);
+    }
+
+    function getForwarder() external view returns (address) {
+        return address(forwarder);
     }
 }

@@ -49,4 +49,8 @@ interface ICorkHook is IErrors {
         returns (uint256 amountOut);
 
     function getPoolKey(address ra, address ct) external view returns (PoolKey memory);
+
+    function getPoolManager() external view returns (address);
+
+    function getForwarder() external view returns (address);
 }
