@@ -20,9 +20,14 @@ interface ICorkHook is IErrors {
         uint256 deadline
     ) external returns (uint256 amountRa, uint256 amountCt, uint256 mintedLp);
 
-    function removeLiquidity(address ra, address ct, uint256 liquidityAmount)
-        external
-        returns (uint256 amountRa, uint256 amountCt);
+    function removeLiquidity(
+        address ra,
+        address ct,
+        uint256 liquidityAmount,
+        uint256 amountRamin,
+        uint256 amountCtmin,
+        uint256 deadline
+    ) external returns (uint256 amountRa, uint256 amountCt);
 
     function getLiquidityToken(address ra, address ct) external view returns (address);
 

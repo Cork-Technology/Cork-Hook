@@ -134,7 +134,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         }
     }
 
-    // we default to exaact out swap, since it's easier to do flash swap this way
+    // we default to exact out swap, since it's easier to do flash swap this way
     function swap(address ra, address ct, uint256 amountRaOut, uint256 amountCtOut, bytes calldata data)
         external
         onlyInitialized(ra, ct)
@@ -257,28 +257,28 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         }
     }
 
-    function removeLiquidity(address ra, address ct, uint256 liquidityAmount)
-        external
-        onlyInitialized(ra, ct)
-        returns (uint256 amountRa, uint256 amountCt)
-    {
-        (address token0, address token1) = sort(ra, ct);
+    function removeLiquidity(
+        address ra,
+        address ct,
+        uint256 liquidityAmount,
+        uint256 amountRamin,
+        uint256 amountCtmin,
+        uint256 deadline
+    ) external onlyInitialized(ra, ct) withinDeadline(deadline) returns (uint256 amountRa, uint256 amountCt) {
+        SortResult memory sortResult = sortPacked(ra, ct);
 
-        // all sanitiy check should go here
-        // TODO : maybe add more sanity checks
-
-        // check if pool is initialized
-        AmmId ammId = toAmmId(token0, token1);
+        AmmId ammId = toAmmId(sortResult.token0, sortResult.token1);
         PoolState storage self = pool[ammId];
 
-        if (!self.isInitialized()) {
-            revert IErrors.NotInitialized();
+        (uint256 amount0, uint256 amount1,,) = self.tryRemoveLiquidity(liquidityAmount);
+        (,, amountRa, amountCt) = reverseSortWithAmount(ra, ct, sortResult.token0, sortResult.token1, amount0, amount1);
+
+        if (amountRa < amountRamin || amountCt < amountCtmin) {
+            revert IErrors.InsufficientOutputAmout();
         }
 
-        (uint256 amount0, uint256 amount1,,) = pool[toAmmId(token0, token1)].tryRemoveLiquidity(liquidityAmount);
-        (,, amountRa, amountCt) = reverseSortWithAmount(ra, ct, token0, token1, amount0, amount1);
-
-        RemoveLiquidtyParams memory params = RemoveLiquidtyParams(token0, token1, liquidityAmount, msg.sender);
+        RemoveLiquidtyParams memory params =
+            RemoveLiquidtyParams(sortResult.token0, sortResult.token1, liquidityAmount, msg.sender);
 
         bytes memory data = abi.encode(Action.RemoveLiquidity, params);
 

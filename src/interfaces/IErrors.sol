@@ -28,15 +28,15 @@ interface IErrors {
     /// @notice only self call is allowed when forwarding callback in hook forwarder
     error OnlySelfCall();
 
-    /// @notice the infamous K, thrown when the trades resulted in the imbalance of the pool
-    error K();
-
     /// @notice trying to add liquidity with insufficient amount
     error Insufficient0Amount();
 
     /// @notice trying to add liquidity with insufficient amount
     error Insufficient1Amount();
 
+    /// @notice trying to remove liquidity, but the liquidity removed is less than what expected
+    error InsufficientOutputAmout();
+    
     /// @notice deadline has passed
     error Deadline();
 }

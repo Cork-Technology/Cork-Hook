@@ -52,6 +52,12 @@ function sortPacked(address a, address b, uint256 amountA, uint256 amountB) pure
     return SortResult(token0, token1, amount0, amount1);
 }
 
+function sortPacked(address a, address b) pure returns (SortResult memory) {
+    (address token0, address token1) = sort(a, b);
+
+    return SortResult(token0, token1, 0, 0);
+}
+
 struct PoolState {
     uint256 reserve0;
     uint256 reserve1;
