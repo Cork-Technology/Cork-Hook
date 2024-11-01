@@ -19,7 +19,6 @@ contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
     using CurrencyLibrary for Currency;
 
     IPoolManager poolManager;
-    uint256 public constant AMOUNT_IN_EXTRA_WORKAROUND = 11000;
 
     constructor(IPoolManager _poolManager) Ownable(msg.sender) {
         poolManager = _poolManager;
@@ -48,17 +47,12 @@ contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
         address token0 = Currency.unwrap(params.poolKey.currency0);
         address token1 = Currency.unwrap(params.poolKey.currency1);
 
-        if (params.params.zeroForOne) {
-            IERC20(token0).approve(owner(), params.amountIn + AMOUNT_IN_EXTRA_WORKAROUND);
-        } else {
-            IERC20(token1).approve(owner(), params.amountIn + AMOUNT_IN_EXTRA_WORKAROUND);
-        }
-
         poolManager.swap(params.poolKey, params.params, params.swapData);
     }
 
-    /// @notice actually transfer token to user, this is needed in case of flash swap it's important that we first transfer
-    /// the tokens before calling the callback to ensure the caller contract already has the funds.
+    /// @notice actually transfer token to user, this is needed in case of flash swap  it's important that we first transfer
+    /// the tokens before calling the callback to ensure the caller contract already has the funds. used also when user directly swap using hook
+    /// the logic is inside the hook, but here it act on behalf of the user by settling the swap and transferring the token to the user
     /// should only be called after swap or before executing callback and MUST be called only once throughout the entire swap lifecycle
     function forwardToken(Currency _in, Currency out, uint256 amountIn, uint256 amountOut)
         external

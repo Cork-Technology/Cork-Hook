@@ -398,34 +398,13 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             input.take(poolManager, sender, amountIn, false);
 
             // forward token to user if caller is forwarder
-            forwarder.forwardToken(input, output, amountIn, amountOut);
+            if (sender == address(forwarder)) {
+                forwarder.forwardToken(input, output, amountIn, amountOut);
+            }
         }
-
-        (uint256 kAfter,) = _kWithFee(self, amountIn, input);
 
         // IMPORTANT: we won't compare K right now since the K amount will never be the same and have slight imprecision.
         // but this is fine since the hook knows how much tokens it should receive and give based on the balance delta
-        if (kAfter < kBefore) {
-            // revert IErrors.K();
-        }
-    }
-
-    function _kWithFee(PoolState storage self, uint256 amountIn, Currency input)
-        internal
-        view
-        returns (uint256 k, uint256 fee)
-    {
-        (uint256 start, uint256 end) = _getIssuedAndMaturationTime(self);
-        fee = SwapMath.getFee(amountIn, self.fee, start, end, block.timestamp);
-
-        (uint256 reserve0, uint256 reserve1) = (self.reserve0, self.reserve1);
-
-        // subtract from reserve if input is token0
-        reserve0 = Currency.unwrap(input) == self.token0 ? reserve0 - fee : reserve0;
-        // subtract from reserve if input is token1
-        reserve1 = Currency.unwrap(input) == self.token1 ? reserve1 - fee : reserve1;
-
-        k = SwapMath.getInvariant(reserve0, reserve1, start, end, block.timestamp);
     }
 
     function getFee(address ra, address ct)

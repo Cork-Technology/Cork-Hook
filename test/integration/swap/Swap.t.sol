@@ -63,6 +63,7 @@ contract SwapTest is TestHelper {
 
         vm.startPrank(DEFAULT_ADDRESS);
 
+        // in this case, the hook itself become the router, so we need to approve it
         token0.approve(address(hook), 10000 ether);
         token1.approve(address(hook), 10000 ether);
 
@@ -78,20 +79,21 @@ contract SwapTest is TestHelper {
 
         vm.startPrank(DEFAULT_ADDRESS);
 
-        token0.approve(address(hook), 10000 ether);
-        token1.approve(address(hook), 10000 ether);
+        // approve the router to spend
+        token0.approve(address(swapRouter), 10000 ether);
+        token1.approve(address(swapRouter), 10000 ether);
 
         uint256 balanceBeforeToken1 = token1.balanceOf(DEFAULT_ADDRESS);
         uint256 balanceBeforeToken0 = token0.balanceOf(DEFAULT_ADDRESS);
 
         IPoolManager.SwapParams memory params = IPoolManager.SwapParams(true, int256(yOut), Constants.SQRT_PRICE_1_1);
+
         swapRouter.swap(
             hook.getPoolKey(address(token0), address(token1)),
             params,
             PoolSwapTest.TestSettings(false, false),
             bytes("")
         );
-        // poolManager.swap(hook.getPoolKey(address(token0), address(token1)), params, bytes(""));
 
         uint256 balanceAfterToken1 = token1.balanceOf(DEFAULT_ADDRESS);
         uint256 balanceAfterToken0 = token0.balanceOf(DEFAULT_ADDRESS);
