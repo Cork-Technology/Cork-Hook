@@ -1,4 +1,7 @@
-pragma solidity 0.8.26;
+pragma solidity ^0.8.0;
+
+import "v4-periphery/lib/v4-core/src/interfaces/IPoolManager.sol";
+import "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
 
 enum Action {
     AddLiquidity,
@@ -19,4 +22,14 @@ struct RemoveLiquidtyParams {
     address token1;
     uint256 liquidityAmount;
     address sender;
+}
+
+struct SwapParams {
+    // for flashswap
+    bytes swapData;
+    IPoolManager.SwapParams params;
+    PoolKey poolKey;
+    address sender;
+    uint256 amountOut;
+    uint256 amountIn;
 }
