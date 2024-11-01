@@ -6,8 +6,15 @@ interface CorkSwapCallback {
      * @notice a callback function that will be called by the hook when doing swap, intended use case for flash swap
      * @param sender the address that initiated the swap
      * @param data the data that will be passed to the callback
-     * @param paymentAmount the amount of tokens that the user must approve to be spent by the hook, DO NOT transfer token directly, the hook will takes care of that. the amount will be calculated in respect of your specified token to pay.
-     * @param paymentToken the token that the user must approve to be spent by the hook, DO NOT transfer token directly, you will lose your funds.
+     * @param paymentAmount the amount of tokens that the user must transfer to the pool manager
+     * @param paymentToken the token that the user must transfer  to the pool manager
+     * @param poolManager the pool manager to transfer the payment token to
      */
-    function CorkCall(address sender, bytes calldata data, uint256 paymentAmount, address paymentToken) external;
+    function CorkCall(
+        address sender,
+        bytes calldata data,
+        uint256 paymentAmount,
+        address paymentToken,
+        address poolManager
+    ) external;
 }
