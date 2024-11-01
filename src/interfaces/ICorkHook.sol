@@ -53,4 +53,18 @@ interface ICorkHook is IErrors {
     function getPoolManager() external view returns (address);
 
     function getForwarder() external view returns (address);
+
+    event Swapped(
+        address indexed input ,
+        address output,
+        uint256 amountIn,
+        uint256 amountOut,
+        address who,
+        uint256 baseFeePercentage,
+        uint256 realizedFeePercentage
+    );
+
+    event AddedLiquidity(address ra, address ct, uint256 raAmount, uint256 ctAmount, uint256 mintedLp, address who);
+
+    event RemovedLiquidity(address ra, address ct, uint256 raAmount, uint256 ctAmount, address who);
 }

@@ -69,6 +69,10 @@ contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
         CurrencySettler.settle(_in, poolManager, address(this), amountIn, false);
     }
 
+    function getCurrentSender() external view returns (address) {
+        return SenderSlot.get();
+    }
+
     /// @notice forward token without clearing the sender, MUST only be called before executing flash swap callback and ONLY ONCE in the entire swap lifecycle
     /// this is needed in case of when user directly swap using hook
     function forwardTokenUncheked(Currency out, uint256 amountOut) external onlyOwner {

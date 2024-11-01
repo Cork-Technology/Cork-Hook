@@ -31,7 +31,6 @@ import "./interfaces/ICorkHook.sol";
 import "forge-std/console.sol";
 
 // TODO : make documentation on how to properly initialize the pool
-// TODO : implement fee properly without checking K
 // TODO : create events
 // TODO : make it upgradeable
 contract CorkHook is BaseHook, Ownable, ICorkHook {
@@ -264,6 +263,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
             poolManager.unlock(data);
         }
+
+        emit ICorkHook.AddedLiquidity(ra, ct, amountRa, amountCt, mintedLp, msg.sender);
     }
 
     function removeLiquidity(
@@ -291,12 +292,18 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             revert IErrors.InsufficientOutputAmout();
         }
 
-        RemoveLiquidtyParams memory params =
-            RemoveLiquidtyParams(sortResult.token0, sortResult.token1, liquidityAmount, msg.sender);
+        {
+            RemoveLiquidtyParams memory params =
+                RemoveLiquidtyParams(sortResult.token0, sortResult.token1, liquidityAmount, msg.sender);
 
-        bytes memory data = abi.encode(Action.RemoveLiquidity, params);
+            bytes memory data = abi.encode(Action.RemoveLiquidity, params);
 
-        poolManager.unlock(data);
+            poolManager.unlock(data);
+        }
+
+        {
+            emit ICorkHook.RemovedLiquidity(ra, ct, amountRa, amountCt, msg.sender);
+        }
     }
 
     function _unlockCallback(bytes calldata data) internal virtual override returns (bytes memory) {
@@ -420,7 +427,26 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         }
 
         // IMPORTANT: we won't compare K right now since the K amount will never be the same and have slight imprecision.
-        // but this is fine since the hook knows how much tokens it should receive and give based on the balance delta
+        // but this is fine since the hook knows how much tokens it should receive and give based on the balance delta which it calculate from the invariants
+
+        {
+            // the true caller, we try to infer this by checking if the sender is the forwarder, we can get the true caller from
+            // the forwarder transient slot
+            // if not then we fallback to whoever is the sender
+            address actualSender = sender == address(forwarder) ? forwarder.getCurrentSender() : sender;
+
+            (uint256 baseFeePercentage, uint256 actualFeePercentage) = _getFee(self);
+
+            emit ICorkHook.Swapped(
+                Currency.unwrap(input),
+                Currency.unwrap(output),
+                amountIn,
+                amountOut,
+                actualSender,
+                baseFeePercentage,
+                actualFeePercentage
+            );
+        }
     }
 
     function getFee(address ra, address ct)
@@ -429,9 +455,19 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         onlyInitialized(ra, ct)
         returns (uint256 baseFeePercentage, uint256 actualFeePercentage)
     {
-        baseFeePercentage = pool[toAmmId(ra, ct)].fee;
+        PoolState storage self = pool[toAmmId(ra, ct)];
 
-        (uint256 start, uint256 end) = _getIssuedAndMaturationTime(pool[toAmmId(ra, ct)]);
+        (baseFeePercentage, actualFeePercentage) = _getFee(self);
+    }
+
+    function _getFee(PoolState storage self)
+        internal
+        view
+        returns (uint256 baseFeePercentage, uint256 actualFeePercentage)
+    {
+        baseFeePercentage = self.fee;
+
+        (uint256 start, uint256 end) = _getIssuedAndMaturationTime(self);
         actualFeePercentage = SwapMath.getFeePercentage(baseFeePercentage, start, end, block.timestamp);
     }
 
