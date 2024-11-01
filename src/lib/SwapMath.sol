@@ -6,103 +6,63 @@ import "./balancers/LogExpMath.sol";
 library SwapMath {
     using FixedPoint for uint256;
 
-    /// @notice amountOut = reserveOut - (k - (reserveIn + amountIn)^(1-t))^1/(1-t)
-    function getAmountOut(
-        uint256 amountIn,
-        uint256 reserveIn,
-        uint256 reserveOut,
-        uint256 kInitial,
-        uint256 _1MinT,
-        uint256 baseFee
-    ) internal pure returns (uint256 amountOut) {
-        // Calculate fee factor = baseFee x t in percentage, we complement _1MinT to get t
-        // the end result should be total fee that we must take out
-        uint256 feeFactor = baseFee.mulDown(_1MinT.complement());
-        uint256 fee = calculatePercentage(amountIn, feeFactor);
-
-        // Calculate amountIn after fee = amountIn * feeFactor
-        amountIn = amountIn.sub(fee);
-
-        uint256 reserveInExp = LogExpMath.pow(reserveIn, _1MinT);
-
-        uint256 reserveOutExp = LogExpMath.pow(reserveOut, _1MinT);
-
+    /// @notice amountOut =  reserveOut - (k - (reserveIn + amountIn)^(1-t))^1/(1-t)
+    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut, uint256 kInitial, uint256 _1MinT)
+        internal
+        pure
+        returns (uint256 amountOut)
+    {
+        uint256 reserveInExp = FixedPoint.powDown(reserveIn, _1MinT);
+        uint256 reserveOutExp = FixedPoint.powDown(reserveOut, _1MinT);
         uint256 k = reserveInExp.add(reserveOutExp);
 
         assert(k >= kInitial);
         // Calculate q = (k - (reserveIn + amountIn)^(1-t))^1/(1-t)
-        uint256 q = reserveIn.add(amountIn);
-        q = LogExpMath.pow(q, _1MinT);
-        q = LogExpMath.pow(k.sub(q), FixedPoint.ONE.divDown(_1MinT));
+        uint256 q = FixedPoint.powDown(reserveIn.add(amountIn), _1MinT);
+        q = FixedPoint.powDown(k.sub(q), FixedPoint.ONE.divDown(_1MinT));
 
         // Calculate amountOut = reserveOut - q
         amountOut = reserveOut.sub(q);
     }
 
     /// @notice amountIn = (k - (reserveOut - amountOut)^(1-t))^1/(1-t) - reserveIn
-    /// fee = amountIn * baseFee x t
-    /// receive = amountIn - fee
-    function getAmountIn(
-        uint256 amountOut,
-        uint256 reserveIn,
-        uint256 reserveOut,
-        uint256 kInitial,
-        uint256 _1MinT,
-        uint256 baseFee
-    ) internal pure returns (uint256 amountIn) {
-        uint256 reserveInExp = LogExpMath.pow(reserveIn, _1MinT);
-
-        uint256 reserveOutExp = LogExpMath.pow(reserveOut, _1MinT);
-
+    function getAmountIn(uint256 amountOut, uint256 reserveIn, uint256 reserveOut, uint256 kInitial, uint256 _1MinT)
+        internal
+        pure
+        returns (uint256 amountIn)
+    {
+        uint256 reserveInExp = FixedPoint.powDown(reserveIn, _1MinT);
+        uint256 reserveOutExp = FixedPoint.powDown(reserveOut, _1MinT);
         uint256 k = reserveInExp.add(reserveOutExp);
 
         assert(k >= kInitial);
         // Calculate q = (reserveOut - amountOut)^(1-t))^1/(1-t)
-        uint256 q = LogExpMath.pow(reserveOut.sub(amountOut), _1MinT);
-        q = LogExpMath.pow(k.sub(q), FixedPoint.ONE.divDown(_1MinT));
+        uint256 q = FixedPoint.powDown(reserveOut.sub(amountOut), _1MinT);
+        q = FixedPoint.powDown(k.sub(q), FixedPoint.ONE.divDown(_1MinT));
 
         // Calculate amountIn = q - reserveIn
         amountIn = q.sub(reserveIn);
-
-        // Calculate fee factor = baseFee x t in percentage, we complement _1MinT to get t
-        // the end result should be total fee that we must take out
-        uint256 feeFactor = baseFee.mulDown(_1MinT.complement());
-        uint256 fee = calculatePercentage(amountIn, feeFactor);
-
-        // Calculate amountIn after fee = amountIn * feeFactor
-        amountIn = amountIn.sub(fee);
     }
 
-    /// @notice Get normalized time (t) as a value between 1 and 0, it'll approach 0 as time goes on
-    function getNormalizedTimeToMaturity(uint256 startTime, uint256 maturityTime, uint256 currentTime)
-        public
-        pure
-        returns (uint256 t)
-    {
-        uint256 elapsedTime = currentTime.sub(startTime);
+    /// @notice Get normalized time (t) as a value between 0 and 1
+    function getNormalizedTime(uint256 startTime, uint256 maturityTime) public view returns (uint256 t) {
+        uint256 elapsedTime = block.timestamp.sub(startTime);
         uint256 totalDuration = maturityTime.sub(startTime);
 
-        // we return 0 in case it's past maturity time
-        if (elapsedTime >= totalDuration) {
-            return 0;
-        }
+        require(elapsedTime <= totalDuration, "Past maturity");
 
         // Return a normalized time between 0 and 1 (as a percentage in 18 decimals)
-        t = elapsedTime.divDown(totalDuration).complement();
+        t = elapsedTime.divDown(totalDuration);
     }
 
     /// @notice calculate 1 - t
-    function oneMinusT(uint256 startTime, uint256 maturityTime, uint256 currentTime) public pure returns (uint256) {
-        return FixedPoint.complement(getNormalizedTimeToMaturity(startTime, maturityTime, currentTime));
+    function oneMinusT(uint256 startTime, uint256 maturityTime) public view returns (uint256) {
+        return FixedPoint.complement(getNormalizedTime(startTime, maturityTime));
     }
 
     /// @notice feePercentage =  baseFee x t. where t is normalized time
-    function getFeePercentage(uint256 baseFee, uint256 startTime, uint256 maturityTime, uint256 currentTime)
-        public
-        pure
-        returns (uint256)
-    {
-        uint256 t = getNormalizedTimeToMaturity(startTime, maturityTime, currentTime);
+    function getFeePercentage(uint256 baseFee, uint256 startTime, uint256 maturityTime) public view returns (uint256) {
+        uint256 t = getNormalizedTime(startTime, maturityTime);
         return baseFee.mulDown(t);
     }
 
@@ -112,28 +72,22 @@ library SwapMath {
     }
 
     /// @notice calculate fee = amount * (baseFee x t) / 100
-    function getFee(uint256 amount, uint256 baseFee, uint256 startTime, uint256 maturityTime, uint256 currentTime)
-        public
-        pure
-        returns (uint256)
-    {
-        uint256 feePercentage = getFeePercentage(baseFee, startTime, maturityTime, currentTime);
+    function getFee(uint256 amount, uint256 baseFee, uint256 startTime, uint256 maturityTime) public view returns (uint256) {
+        uint256 feePercentage = getFeePercentage(baseFee, startTime, maturityTime);
         return calculatePercentage(feePercentage, amount);
     }
 
     /// @notice calculate k = x^(1-t) + y^(1-t)
-    function getInvariant(
-        uint256 reserve0,
-        uint256 reserve1,
-        uint256 startTime,
-        uint256 maturityTime,
-        uint256 currentTime
-    ) public pure returns (uint256 k) {
-        uint256 t = oneMinusT(startTime, maturityTime, currentTime);
+    function getInvariant(uint256 reserve0, uint256 reserve1, uint256 startTime, uint256 maturityTime)
+        public
+        view
+        returns (uint256 k)
+    {
+        uint256 t = oneMinusT(startTime, maturityTime);
 
         // Calculate x^(1-t) and y^(1-t) (x and y are reserveRA and reserveCT)
-        uint256 xTerm = LogExpMath.pow(reserve0, t);
-        uint256 yTerm = LogExpMath.pow(reserve1, t);
+        uint256 xTerm = FixedPoint.powDown(reserve0, t);
+        uint256 yTerm = FixedPoint.powDown(reserve1, t);
 
         // Invariant k is x^(1-t) + y^(1-t)
         k = xTerm.add(yTerm);

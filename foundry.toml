@@ -3,10 +3,5 @@ src = "src"
 out = "out"
 libs = ["lib"]
 ffi = true
-optimizer = true
-fs_permissions = [{ access = "read-write", path = ".forge-snapshots/" }]
+fs_permissions = [{ access = "read-write", path = ".forge-snapshots/"}]
 evm_version = "cancun"
-
-[profile.release]
-# reducing bytecode size and increasing leeway for stack depth(i.e avoiding stack too deep error)
-via_ir = true

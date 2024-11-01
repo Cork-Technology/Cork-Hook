@@ -1,10 +1,9 @@
-pragma solidity 0.8.26;
+pragma solidity ^0.8.0;
 
-import {LiquidityMath} from "./LiquidityMath.sol";
-import {LiquidityToken} from "./../LiquidityToken.sol";
-import {Currency} from "v4-periphery/lib/v4-core/src/types/Currency.sol";
+import "./LiquidityMath.sol";
+import "./../LiquidityToken.sol";
+import "v4-periphery/lib/v4-core/src/types/Currency.sol";
 import "./balancers/FixedPoint.sol";
-import "./../interfaces/IErrors.sol";
 
 /// @notice amm id,
 type AmmId is bytes32;
@@ -21,13 +20,6 @@ function toAmmId(Currency _ra, Currency _ct) pure returns (AmmId) {
     return toAmmId(ra, ct);
 }
 
-struct SortResult {
-    address token0;
-    address token1;
-    uint256 amount0;
-    uint256 amount1;
-}
-
 function sort(address a, address b) pure returns (address, address) {
     return a < b ? (a, b) : (b, a);
 }
@@ -36,13 +28,7 @@ function reverseSortWithAmount(address a, address b, address token0, address tok
     pure
     returns (address, address, uint256, uint256)
 {
-    if (a == token0 && b == token1) {
-        return (token0, token1, amount0, amount1);
-    } else if (a == token1 && b == token0) {
-        return (token1, token0, amount1, amount0);
-    } else {
-        revert IErrors.InvalidToken();
-    }
+    return a == token0 ? (token0, token1, amount0, amount1) : (token1, token0, amount1, amount0);
 }
 
 function sort(address a, address b, uint256 amountA, uint256 amountB)
@@ -50,18 +36,6 @@ function sort(address a, address b, uint256 amountA, uint256 amountB)
     returns (address, address, uint256, uint256)
 {
     return a < b ? (a, b, amountA, amountB) : (b, a, amountB, amountA);
-}
-
-function sortPacked(address a, address b, uint256 amountA, uint256 amountB) pure returns (SortResult memory) {
-    (address token0, address token1, uint256 amount0, uint256 amount1) = sort(a, b, amountA, amountB);
-
-    return SortResult(token0, token1, amount0, amount1);
-}
-
-function sortPacked(address a, address b) pure returns (SortResult memory) {
-    (address token0, address token1) = sort(a, b);
-
-    return SortResult(token0, token1, 0, 0);
 }
 
 struct PoolState {
@@ -78,31 +52,20 @@ struct PoolState {
 library PoolStateLibrary {
     uint256 constant MAX_FEE = FixedPoint.ONE * 100;
 
-    function ensureLiquidityEnough(PoolState storage state, uint256 amountOut, address token) internal view {
-        if (token == state.token0 && state.reserve0 < amountOut) {
-            revert IErrors.NotEnoughLiquidity();
-        } else if (token == state.token1 && state.reserve1 < amountOut) {
-            revert IErrors.NotEnoughLiquidity();
-        } else {
-            return;
-        }
-    }
-
     function updateReserves(PoolState storage state, address token, uint256 amount, bool minus) internal {
         if (token == state.token0) {
             state.reserve0 = minus ? state.reserve0 - amount : state.reserve0 + amount;
         } else if (token == state.token1) {
             state.reserve1 = minus ? state.reserve1 - amount : state.reserve1 + amount;
         } else {
-            revert IErrors.InvalidToken();
+            // TODO : move to interface
+            revert("Token not in pool");
         }
     }
 
     function updateFee(PoolState storage state, uint256 fee) internal {
-        if (fee >= MAX_FEE) {
-            revert IErrors.InvalidFee();
-        }
-
+        // TODO : move to interface
+        require(fee <= MAX_FEE, "Fee too high");
         state.fee = fee;
     }
 
@@ -124,37 +87,20 @@ library PoolStateLibrary {
         return state.token0 != address(0);
     }
 
-    function tryAddLiquidity(
-        PoolState storage state,
-        uint256 amount0,
-        uint256 amount1,
-        uint256 amount0min,
-        uint256 amount1min
-    )
+    function tryAddLiquidity(PoolState storage state, uint256 amount0, uint256 amount1)
         internal
-        returns (uint256 reserve0, uint256 reserve1, uint256 mintedLp, uint256 amount0Used, uint256 amount1Used)
+        returns (uint256 reserve0, uint256 reserve1, uint256 mintedLp)
     {
-        (amount0Used, amount1Used) =
-            LiquidityMath.inferOptimalAmount(state.reserve0, state.reserve1, amount0, amount1, amount0min, amount1min);
-
         (reserve0, reserve1, mintedLp) = LiquidityMath.addLiquidity(
             state.reserve0, state.reserve1, state.liquidityToken.totalSupply(), amount0, amount1
         );
     }
 
-    function addLiquidity(
-        PoolState storage state,
-        uint256 amount0,
-        uint256 amount1,
-        address sender,
-        uint256 amount0min,
-        uint256 amount1min
-    )
+    function addLiquidity(PoolState storage state, uint256 amount0, uint256 amount1, address sender)
         internal
-        returns (uint256 reserve0, uint256 reserve1, uint256 mintedLp, uint256 amount0Used, uint256 amount1Used)
+        returns (uint256 reserve0, uint256 reserve1, uint256 mintedLp)
     {
-        (reserve0, reserve1, mintedLp, amount0Used, amount1Used) =
-            tryAddLiquidity(state, amount0, amount1, amount0min, amount1min);
+        (reserve0, reserve1, mintedLp) = tryAddLiquidity(state, amount0, amount1);
 
         state.reserve0 = reserve0;
         state.reserve1 = reserve1;
