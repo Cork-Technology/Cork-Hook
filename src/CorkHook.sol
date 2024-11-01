@@ -137,6 +137,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     }
 
     // we default to exact out swap, since it's easier to do flash swap this way
+    // only support flash swap where the user pays with the other tokens
+    // for paying with the same token, use "take" and "settle" directly in the pool manager
     function swap(address ra, address ct, uint256 amountRaOut, uint256 amountCtOut, bytes calldata data)
         external
         onlyInitialized(ra, ct)
@@ -173,10 +175,15 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         address token0 = Currency.unwrap(params.poolKey.currency0);
         address token1 = Currency.unwrap(params.poolKey.currency1);
 
-        if (params.params.zeroForOne) {
-            IERC20(token0).transferFrom(params.sender, address(forwarder), params.amountIn);
-        } else {
-            IERC20(token1).transferFrom(params.sender, address(forwarder), params.amountIn);
+        // regular swap, the user already has the token, so we directly transfer the token to the forwarder
+        // if it has data, then its a flash swap, user usually doesn't have the token to pay, so we skip this step
+        // and let the user pay on the callback directly to pool manager
+        if (params.swapData.length == 0) {
+            if (params.params.zeroForOne) {
+                IERC20(token0).transferFrom(params.sender, address(forwarder), params.amountIn);
+            } else {
+                IERC20(token1).transferFrom(params.sender, address(forwarder), params.amountIn);
+            }
         }
 
         forwarder.swap(params);
@@ -341,20 +348,23 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         PoolState storage self = pool[toAmmId(Currency.unwrap(key.currency0), Currency.unwrap(key.currency1))];
         // kinda packed, avoid stack too deep
 
-        delta = toBeforeSwapDelta(
-            -int128(params.amountSpecified), int128(int256(_beforeSwap(self, params, hookData, sender)))
-        );
+        delta = toBeforeSwapDelta(-int128(params.amountSpecified), int128(_beforeSwap(self, params, hookData, sender)));
 
         // TODO: do we really need to specify the fee here?
         return (this.beforeSwap.selector, delta, 0);
     }
 
+    // logically the flow is
+    // 1. the hook settle the output token first, to create a debit. this enable flash swap
+    // 2. token is transferred to the user using forwarder or router
+    // 3 the user/router settle(pay) the input token
+    // 4. the hook take the input token
     function _beforeSwap(
         PoolState storage self,
         IPoolManager.SwapParams calldata params,
         bytes calldata hookData,
         address sender
-    ) internal returns (uint256 unspecificiedAmount) {
+    ) internal returns (int256 unspecificiedAmount) {
         bool exactIn = (params.amountSpecified < 0);
         uint256 amountIn;
         uint256 amountOut;
@@ -369,7 +379,15 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             (params.zeroForOne, amountOut);
         }
 
-        unspecificiedAmount = exactIn ? amountOut : amountIn;
+        // if exact in, the hook must goes into "debt" equal to amount out
+        // since at that point, the user specifies how much token they wanna swap. you can think of it like
+        //
+        // EXACT IN :
+        // specifiedDelta : unspecificiedDelta =  how much input token user want to swap : how much the hook must give
+        //
+        // EXACT OUT :
+        // unspecificiedDelta : specifiedDelta =  how much output token the user wants : how much input token user must pay
+        unspecificiedAmount = exactIn ? -int256(amountOut) : int256(amountIn);
 
         (Currency input, Currency output) = _getInputOutput(self, params.zeroForOne);
 
@@ -385,8 +403,6 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
         // there is data, means flash swap
         if (hookData.length > 0) {
-            // avoid stack too deep
-            forwarder.forwardToken(input, output, amountIn, amountOut);
             // will 0 if user pay with the same token
             unspecificiedAmount = _executeFlashSwap(self, hookData, input, output, amountIn, amountOut, sender, exactIn);
             // no data, means normal swap
@@ -395,7 +411,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             self.updateReserves(Currency.unwrap(input), amountIn, false);
 
             // settle swap, i.e we take the input token from the pool manager, the debt will be payed by the user
-            input.take(poolManager, sender, amountIn, false);
+            input.take(poolManager, address(this), amountIn, true);
 
             // forward token to user if caller is forwarder
             if (sender == address(forwarder)) {
@@ -428,41 +444,48 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         uint256 amountOut,
         address sender,
         bool exactIn
-    ) internal returns (uint256 unspecificiedAmount) {
-        // infer what token would be used for payment, if counterPayment is true, then the input token is used for payment, otherwise its the output token
-        bool counterPayment = abi.decode(hookData, (bool));
+    ) internal returns (int256 unspecificiedAmount) {
+        // exact in doesn't make sense on flash swap
+        if (exactIn) {
+            revert IErrors.NoExactIn();
+        }
 
         {
+            // send funds to the user
+            try forwarder.forwardTokenUncheked(output, amountOut) {}
+            // if failed then the user directly calls pool manager to flash swap, in that case we must send their token directly here
+            catch {
+                poolManager.take(output, sender, amountOut);
+            }
+
             // we expect user to use exact output swap when dealing with flash swap
-            // so we use amountOut as the payment amount cause they simply have to return the borrowed amount
-            // or it's the in amount that they have to pay with the other token
-            (uint256 paymentAmount, address paymentToken) =
-                counterPayment ? (amountIn, Currency.unwrap(input)) : (amountOut, Currency.unwrap(output));
+            // so we use amountIn as the payment amount cause they they have to pay with the other token
+            (uint256 paymentAmount, address paymentToken) = (amountIn, Currency.unwrap(input));
 
             // call the callback
             CorkSwapCallback(sender).CorkCall(sender, hookData, paymentAmount, paymentToken, address(poolManager));
         }
 
         // process repayments
-        if (counterPayment) {
-            // update reserve
-            self.updateReserves(Currency.unwrap(input), amountIn, false);
 
-            // settle swap, i.e we take the input token from the pool manager, the debt will be payed by the user, at this point, the user should've created a debit on the PM
-            input.take(poolManager, sender, amountIn, false);
+        // update reserve
+        self.updateReserves(Currency.unwrap(input), amountIn, false);
 
-            // this is similar to normal swap, the unspecified amount is the other tokens
-            unspecificiedAmount = exactIn ? amountOut : amountIn;
-        } else {
-            // update reserve
-            self.updateReserves(Currency.unwrap(output), amountOut, false);
+        // settle swap, i.e we take the input token from the pool manager, the debt will be payed by the user, at this point, the user should've created a debit on the PM
+        input.take(poolManager, sender, amountIn, false);
 
-            // we take the original borrowed tokens from the pool manager, at this point the hook should still have the original debit outstanding on the PM
-            output.take(poolManager, sender, amountOut, false);
-
-            // no swap actually occured, the user has paid their balance
-            unspecificiedAmount = 0;
-        }
+        // this is similar to normal swap, the unspecified amount is the other tokens
+        // if exact in, the hook must goes into "debt" equal to amount out
+        // since at that point, the user specifies how much token they wanna swap. you can think of it like
+        //
+        // EXACT IN :
+        // specifiedDelta : unspecificiedDelta =  how much input token user want to swap : how much the hook must give
+        //
+        // EXACT OUT :
+        // unspecificiedDelta : specifiedDelta =  how much output token the user wants : how much input token user must pay
+        //
+        // since in this case, exact in swap doesn't really make sense, we just return the amount in
+        unspecificiedAmount = int256(amountIn);
     }
 
     function _getAmountIn(PoolState storage self, bool zeroForOne, uint256 amountOut)

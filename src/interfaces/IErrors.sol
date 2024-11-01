@@ -39,4 +39,7 @@ interface IErrors {
     
     /// @notice deadline has passed
     error Deadline();
+
+    /// @notice trying to do flash swap with exact in
+    error NoExactIn();
 }

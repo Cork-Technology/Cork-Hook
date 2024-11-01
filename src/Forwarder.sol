@@ -50,8 +50,7 @@ contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
         poolManager.swap(params.poolKey, params.params, params.swapData);
     }
 
-    /// @notice actually transfer token to user, this is needed in case of flash swap  it's important that we first transfer
-    /// the tokens before calling the callback to ensure the caller contract already has the funds. used also when user directly swap using hook
+    /// @notice actually transfer token to user, this is needed in case of when user directly swap using hook
     /// the logic is inside the hook, but here it act on behalf of the user by settling the swap and transferring the token to the user
     /// should only be called after swap or before executing callback and MUST be called only once throughout the entire swap lifecycle
     function forwardToken(Currency _in, Currency out, uint256 amountIn, uint256 amountOut)
@@ -70,6 +69,18 @@ contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
         CurrencySettler.settle(_in, poolManager, address(this), amountIn, false);
     }
 
+    /// @notice forward token without clearing the sender, MUST only be called before executing flash swap callback and ONLY ONCE in the entire swap lifecycle
+    /// this is needed in case of when user directly swap using hook
+    function forwardTokenUncheked(Currency out, uint256 amountOut) external onlyOwner {
+        address sender = SenderSlot.get();
+
+        if (sender == address(0)) {
+            revert IErrors.NoSender();
+        }
+
+        CurrencySettler.take(out, poolManager, sender, amountOut, false);
+    }
+
     /// @notice we're just forwarding the call to the callback contract
     function CorkCall(address sender, bytes calldata data, uint256 paymentAmount, address paymentToken, address pm)
         external
@@ -82,6 +93,10 @@ contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
 
         // we set the sender to the original sender.
         sender = SenderSlot.get();
+
+        if (sender == address(0)) {
+            revert IErrors.NoSender();
+        }
 
         poolManager.sync(Currency.wrap(paymentToken));
 
