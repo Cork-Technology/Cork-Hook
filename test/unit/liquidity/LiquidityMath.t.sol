@@ -2,6 +2,7 @@ pragma solidity ^0.8.0;
 
 import "./../../../src/lib/LiquidityMath.sol";
 import "forge-std/Test.sol";
+import "forge-std/console.sol";
 
 contract LiquidityMathTest is Test {
     function test_addLiquidityFirst() external {
@@ -38,18 +39,6 @@ contract LiquidityMathTest is Test {
         vm.assertEq(newReserve1, amount1 + reserve1);
 
         vm.assertApproxEqAbs(liquidityMinted, 474.3416491 ether, 0.0001 ether);
-    }
-
-    function testRevert_nonProportionalLiquidity() external {
-        uint256 reserve0 = 2000 ether;
-        uint256 reserve1 = 1800 ether;
-        uint256 totalLiquidity = 948.6832 ether;
-
-        uint256 amount0 = 1000 ether;
-        uint256 amount1 = 900 ether;
-
-        vm.expectRevert();
-        LiquidityMath.addLiquidity(reserve0 + 1, reserve1, totalLiquidity, amount0, amount1);
     }
 
     function test_removeLiquidity() external {
@@ -105,5 +94,53 @@ contract LiquidityMathTest is Test {
 
         vm.expectRevert();
         LiquidityMath.removeLiquidity(reserve0, reserve1, totalLiquidity, liquidityAmount);
+    }
+
+    function testFuzz_proportionalAmount(uint256 amount0) external {
+        amount0 = bound(amount0, 1 ether, 100000 ether);
+
+        uint256 reserve0 = 1000 ether;
+        uint256 reserve1 = 2000 ether;
+
+        uint256 amount1 = LiquidityMath.getProportionalAmount(amount0, reserve0, reserve1);
+
+        vm.assertEq(amount1, amount0 * 2);
+    }
+
+    function test_dustInferOptimalAmount() external {
+        uint256 amount0Desired = 1 ether;
+
+        uint256 amount1Desired = 5 ether;
+
+        uint256 reserve0 = 1000 ether;
+        uint256 reserve1 = 2000 ether;
+
+        (uint256 amount0, uint256 amount1) =
+            LiquidityMath.inferOptimalAmount(reserve0, reserve1, amount0Desired, amount1Desired, 0, 0);
+
+        // we only use 2 ether
+        vm.assertEq(amount1, 2 ether);
+
+        amount1Desired = 0.5 ether;
+
+        (amount0, amount1) = LiquidityMath.inferOptimalAmount(reserve0, reserve1, amount0Desired, amount1Desired, 0, 0);
+
+        // we only use 0.25 ether
+        vm.assertEq(amount0, 0.25 ether);
+        vm.assertEq(amount1, amount1Desired);
+    }
+
+    function testRevert_noOptimalAmount() external {
+        uint256 amount0Desired = 1;
+        uint256 amount1Desired = 9;
+
+        uint256 reserve0 = 1000 ether;
+        uint256 reserve1 = 10000 ether;
+
+        vm.expectRevert();
+        (uint256 amount0, uint256 amount1) =
+            LiquidityMath.inferOptimalAmount(reserve0, reserve1, amount0Desired, amount1Desired, 0, 0);
+        console.log("amount0", amount0);
+        console.log("amount1", amount1);
     }
 }
