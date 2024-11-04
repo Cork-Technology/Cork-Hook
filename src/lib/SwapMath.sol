@@ -7,7 +7,7 @@ library SwapMath {
     using FixedPoint for uint256;
 
     /// @notice minimum 1-t to not div by 0
-    uint256 internal constant MINIMUM_T = 10;
+    uint256 internal constant MINIMUM_ELAPSED = 1;
 
     /// @notice amountOut = reserveOut - (k - (reserveIn + amountIn)^(1-t))^1/(1-t)
     function getAmountOut(
@@ -83,6 +83,7 @@ library SwapMath {
         returns (uint256 t)
     {
         uint256 elapsedTime = currentTime.sub(startTime);
+        elapsedTime = elapsedTime == 0 ? MINIMUM_ELAPSED : elapsedTime;
         uint256 totalDuration = maturityTime.sub(startTime);
 
         // we return 0 in case it's past maturity time
@@ -96,9 +97,7 @@ library SwapMath {
 
     /// @notice calculate 1 - t
     function oneMinusT(uint256 startTime, uint256 maturityTime, uint256 currentTime) public pure returns (uint256) {
-        uint256 result = FixedPoint.complement(getNormalizedTimeToMaturity(startTime, maturityTime, currentTime));
-
-        return result == 0 ? MINIMUM_T : result;
+        return FixedPoint.complement(getNormalizedTimeToMaturity(startTime, maturityTime, currentTime));
     }
 
     /// @notice feePercentage =  baseFee x t. where t is normalized time
