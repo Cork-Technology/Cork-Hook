@@ -6,6 +6,9 @@ import "./balancers/LogExpMath.sol";
 library SwapMath {
     using FixedPoint for uint256;
 
+    /// @notice minimum 1-t to not div by 0
+    uint256 internal constant MINIMUM_T = 10;
+
     /// @notice amountOut = reserveOut - (k - (reserveIn + amountIn)^(1-t))^1/(1-t)
     function getAmountOut(
         uint256 amountIn,
@@ -93,7 +96,9 @@ library SwapMath {
 
     /// @notice calculate 1 - t
     function oneMinusT(uint256 startTime, uint256 maturityTime, uint256 currentTime) public pure returns (uint256) {
-        return FixedPoint.complement(getNormalizedTimeToMaturity(startTime, maturityTime, currentTime));
+        uint256 result = FixedPoint.complement(getNormalizedTimeToMaturity(startTime, maturityTime, currentTime));
+
+        return result == 0 ? MINIMUM_T : result;
     }
 
     /// @notice feePercentage =  baseFee x t. where t is normalized time

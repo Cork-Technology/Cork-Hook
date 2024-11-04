@@ -112,7 +112,7 @@ contract SwapMathTest is Test {
         uint256 current = 0;
 
         uint256 minT = SwapMath.oneMinusT(start, end, current);
-        vm.assertEq(minT, 0 ether);
+        vm.assertEq(minT, 10);
 
         current = 3 days;
         minT = SwapMath.oneMinusT(start, end, current);
@@ -183,6 +183,6 @@ contract SwapMathTest is Test {
         uint256 current = 0;
 
         uint256 invariant = SwapMath.getInvariant(reserve0, reserve1, start, end, current);
-        vm.assertEq(invariant, 2 ether);
+        vm.assertApproxEqAbs(invariant, 2 ether, 0.00000000001 ether);
     }
 }
