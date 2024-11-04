@@ -14,7 +14,7 @@ import {CurrencySettler} from "v4-periphery/lib/v4-core/test/utils/CurrencySettl
 import {LiquidityToken} from "./LiquidityToken.sol";
 import {Action, AddLiquidtyParams, RemoveLiquidtyParams} from "./lib/Calls.sol";
 import "./lib/State.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import "openzeppelin-contracts/contracts/utils/Strings.sol";
 import "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
 import "./lib/Calls.sol";
