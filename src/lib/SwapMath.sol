@@ -7,7 +7,7 @@ library SwapMath {
     using FixedPoint for uint256;
 
     /// @notice minimum 1-t to not div by 0
-    uint256 internal constant MINIMUM_ELAPSED = 1;
+    uint256 public constant MINIMUM_ELAPSED = 1;
 
     /// @notice amountOut = reserveOut - (k - (reserveIn + amountIn)^(1-t))^1/(1-t)
     function getAmountOut(
@@ -17,7 +17,7 @@ library SwapMath {
         uint256 kInitial,
         uint256 _1MinT,
         uint256 baseFee
-    ) internal pure returns (uint256 amountOut) {
+    ) public pure returns (uint256 amountOut) {
         // Calculate fee factor = baseFee x t in percentage, we complement _1MinT to get t
         // the end result should be total fee that we must take out
         uint256 feeFactor = baseFee.mulDown(_1MinT.complement());
@@ -52,7 +52,7 @@ library SwapMath {
         uint256 kInitial,
         uint256 _1MinT,
         uint256 baseFee
-    ) internal pure returns (uint256 amountIn) {
+    ) public pure returns (uint256 amountIn) {
         uint256 reserveInExp = LogExpMath.pow(reserveIn, _1MinT);
 
         uint256 reserveOutExp = LogExpMath.pow(reserveOut, _1MinT);
