@@ -38,12 +38,12 @@ interface ICorkHook is IErrors {
         view
         returns (uint256 baseFeePercentage, uint256 actualFeePercentage);
 
-    function getAmountIn(address ra, address ct, bool zeroForOne, uint256 amountOut)
+    function getAmountIn(address ra, address ct, bool raForCt, uint256 amountOut)
         external
         view
         returns (uint256 amountIn);
 
-    function getAmountOut(address ra, address ct, bool zeroForOne, uint256 amountIn)
+    function getAmountOut(address ra, address ct, bool raForCt, uint256 amountIn)
         external
         view
         returns (uint256 amountOut);

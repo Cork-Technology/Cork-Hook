@@ -97,7 +97,7 @@ contract SwapMathTest is Test {
         uint256 current = 0;
 
         uint256 normalizedTime = SwapMath.getNormalizedTimeToMaturity(start, end, current);
-        vm.assertEq(normalizedTime, 1 ether);
+        vm.assertApproxEqAbs(normalizedTime, 0.9999 ether, 0.0001 ether);
 
         current = 15 days;
         normalizedTime = SwapMath.getNormalizedTimeToMaturity(start, end, current);
@@ -112,7 +112,8 @@ contract SwapMathTest is Test {
         uint256 current = 0;
 
         uint256 minT = SwapMath.oneMinusT(start, end, current);
-        vm.assertEq(minT, 0 ether);
+        // wont be exactly 0 since we add 1 to the elapsed time if it's 0
+        vm.assertEq(minT, 0.000000385802469135 ether);
 
         current = 3 days;
         minT = SwapMath.oneMinusT(start, end, current);
@@ -133,7 +134,7 @@ contract SwapMathTest is Test {
         uint256 baseFee = 1 ether;
 
         uint256 feePercentage = SwapMath.getFeePercentage(baseFee, start, end, current);
-        vm.assertEq(feePercentage, 1 ether);
+        vm.assertApproxEqAbs(feePercentage, 0.9999 ether, 0.0001 ether);
 
         current = 3 days;
         feePercentage = SwapMath.getFeePercentage(baseFee, start, end, current);
@@ -164,7 +165,7 @@ contract SwapMathTest is Test {
         uint256 current = 0;
 
         uint256 fee = SwapMath.getFee(amount, baseFee, start, end, current);
-        vm.assertEq(fee, 1 ether);
+        vm.assertApproxEqAbs(fee, 0.9999 ether, 0.0001 ether);
 
         current = 15 days;
         fee = SwapMath.getFee(amount, baseFee, start, end, current);
@@ -183,6 +184,6 @@ contract SwapMathTest is Test {
         uint256 current = 0;
 
         uint256 invariant = SwapMath.getInvariant(reserve0, reserve1, start, end, current);
-        vm.assertEq(invariant, 2 ether);
+        vm.assertApproxEqAbs(invariant, 2 ether, 0.0001 ether);
     }
 }

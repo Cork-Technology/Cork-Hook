@@ -4,9 +4,6 @@ out = "out"
 libs = ["lib"]
 ffi = true
 optimizer = true
+optimizer_runs = 1_000_000
 fs_permissions = [{ access = "read-write", path = ".forge-snapshots/" }]
 evm_version = "cancun"
-
-[profile.release]
-# reducing bytecode size and increasing leeway for stack depth(i.e avoiding stack too deep error)
-via_ir = true

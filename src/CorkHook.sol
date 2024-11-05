@@ -14,7 +14,7 @@ import {CurrencySettler} from "v4-periphery/lib/v4-core/test/utils/CurrencySettl
 import {LiquidityToken} from "./LiquidityToken.sol";
 import {Action, AddLiquidtyParams, RemoveLiquidtyParams} from "./lib/Calls.sol";
 import "./lib/State.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import "openzeppelin-contracts/contracts/utils/Strings.sol";
 import "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
 import "./lib/Calls.sol";
@@ -545,13 +545,16 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, invariant, oneMinusT, self.fee);
     }
 
-    function getAmountIn(address ra, address ct, bool zeroForOne, uint256 amountOut)
+    function getAmountIn(address ra, address ct, bool raForCt, uint256 amountOut)
         external
         view
         onlyInitialized(ra, ct)
         returns (uint256 amountIn)
     {
         (address token0, address token1) = sort(ra, ct);
+        // infer zero to one
+        bool zeroForOne = raForCt ? (token0 == ra) : (token0 == ct);
+
         PoolState storage self = pool[toAmmId(token0, token1)];
 
         amountIn = _getAmountIn(self, zeroForOne, amountOut);
@@ -577,13 +580,16 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         amountOut = SwapMath.getAmountOut(amountIn, reserveIn, reserveOut, invariant, oneMinusT, self.fee);
     }
 
-    function getAmountOut(address ra, address ct, bool zeroForOne, uint256 amountIn)
+    function getAmountOut(address ra, address ct, bool raForCt, uint256 amountIn)
         external
         view
         onlyInitialized(ra, ct)
         returns (uint256 amountOut)
     {
         (address token0, address token1) = sort(ra, ct);
+        // infer zero to one
+        bool zeroForOne = raForCt ? (token0 == ra) : (token0 == ct);
+
         PoolState storage self = pool[toAmmId(token0, token1)];
 
         amountOut = _getAmountOut(self, zeroForOne, amountIn);
