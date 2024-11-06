@@ -1,7 +1,7 @@
 pragma solidity ^0.8.0;
 
 import "./balancers/FixedPoint.sol";
-import "./balancers/LogExpMath.sol";
+import "forge-std/console.sol";
 
 library SwapMath {
     using FixedPoint for uint256;
@@ -43,8 +43,6 @@ library SwapMath {
     }
 
     /// @notice amountIn = (k - (reserveOut - amountOut)^(1-t))^1/(1-t) - reserveIn
-    /// fee = amountIn * baseFee x t
-    /// receive = amountIn - fee
     function getAmountIn(
         uint256 amountOut,
         uint256 reserveIn,
@@ -67,13 +65,11 @@ library SwapMath {
         // Calculate amountIn = q - reserveIn
         amountIn = q.sub(reserveIn);
 
-        // Calculate fee factor = baseFee x t in percentage, we complement _1MinT to get t
-        // the end result should be total fee that we must take out
-        uint256 feeFactor = baseFee.mulDown(_1MinT.complement());
-        uint256 fee = calculatePercentage(amountIn, feeFactor);
+        // normalize fee factor to 0-1
+        uint256 feeFactor = baseFee.mulDown(_1MinT.complement()).divDown(100e18);
+        feeFactor = FixedPoint.ONE.sub(feeFactor);
 
-        // Calculate amountIn after fee = amountIn * feeFactor
-        amountIn = amountIn.sub(fee);
+        amountIn = amountIn.divDown(feeFactor);
     }
 
     /// @notice Get normalized time (t) as a value between 1 and 0, it'll approach 0 as time goes on

@@ -40,7 +40,7 @@ contract SwapMathTest is Test {
 
         uint256 _in = SwapMath.getAmountIn(yOut, xReserve, yReserve, k, _1MinT, fee);
 
-        vm.assertApproxEqAbs(_in, xIn - 0.009 ether, 0.001 ether);
+        vm.assertApproxEqAbs(_in, xIn  + 0.009 ether, 0.001 ether);
     }
 
     function test_amountOutWithoutFee() external pure {
