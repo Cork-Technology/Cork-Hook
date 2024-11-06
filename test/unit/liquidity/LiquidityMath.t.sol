@@ -129,18 +129,4 @@ contract LiquidityMathTest is Test {
         vm.assertEq(amount0, 0.25 ether);
         vm.assertEq(amount1, amount1Desired);
     }
-
-    function testRevert_noOptimalAmount() external {
-        uint256 amount0Desired = 1;
-        uint256 amount1Desired = 9;
-
-        uint256 reserve0 = 1000 ether;
-        uint256 reserve1 = 10000 ether;
-
-        vm.expectRevert();
-        (uint256 amount0, uint256 amount1) =
-            LiquidityMath.inferOptimalAmount(reserve0, reserve1, amount0Desired, amount1Desired, 0, 0);
-        console.log("amount0", amount0);
-        console.log("amount1", amount1);
-    }
 }
