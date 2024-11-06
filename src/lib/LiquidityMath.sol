@@ -77,11 +77,6 @@ library LiquidityMath {
                 (amount0, amount1) = (amount0Optimal, amount1Desired);
             }
         }
-
-        // ensure liquidity is proportional
-        if (amount0.mulDown(reserve1) != amount1.mulDown(reserve0)) {
-            revert IErrors.InvalidAmount();
-        }
     }
 
     // Removing Liquidity (Pure Function)
