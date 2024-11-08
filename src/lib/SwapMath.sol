@@ -10,14 +10,11 @@ library SwapMath {
     uint256 public constant MINIMUM_ELAPSED = 1;
 
     /// @notice amountOut = reserveOut - (k - (reserveIn + amountIn)^(1-t))^1/(1-t)
-    function getAmountOut(
-        uint256 amountIn,
-        uint256 reserveIn,
-        uint256 reserveOut,
-        uint256 kInitial,
-        uint256 _1MinT,
-        uint256 baseFee
-    ) public pure returns (uint256 amountOut) {
+    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut, uint256 _1MinT, uint256 baseFee)
+        public
+        pure
+        returns (uint256 amountOut)
+    {
         // Calculate fee factor = baseFee x t in percentage, we complement _1MinT to get t
         // the end result should be total fee that we must take out
         uint256 feeFactor = baseFee.mulDown(_1MinT.complement());
@@ -32,7 +29,6 @@ library SwapMath {
 
         uint256 k = reserveInExp.add(reserveOutExp);
 
-        assert(k >= kInitial);
         // Calculate q = (k - (reserveIn + amountIn)^(1-t))^1/(1-t)
         uint256 q = reserveIn.add(amountIn);
         q = LogExpMath.pow(q, _1MinT);
@@ -43,21 +39,17 @@ library SwapMath {
     }
 
     /// @notice amountIn = (k - (reserveOut - amountOut)^(1-t))^1/(1-t) - reserveIn
-    function getAmountIn(
-        uint256 amountOut,
-        uint256 reserveIn,
-        uint256 reserveOut,
-        uint256 kInitial,
-        uint256 _1MinT,
-        uint256 baseFee
-    ) public pure returns (uint256 amountIn) {
+    function getAmountIn(uint256 amountOut, uint256 reserveIn, uint256 reserveOut, uint256 _1MinT, uint256 baseFee)
+        public
+        pure
+        returns (uint256 amountIn)
+    {
         uint256 reserveInExp = LogExpMath.pow(reserveIn, _1MinT);
 
         uint256 reserveOutExp = LogExpMath.pow(reserveOut, _1MinT);
 
         uint256 k = reserveInExp.add(reserveOutExp);
 
-        assert(k >= kInitial);
         // Calculate q = (reserveOut - amountOut)^(1-t))^1/(1-t)
         uint256 q = LogExpMath.pow(reserveOut.sub(amountOut), _1MinT);
         q = LogExpMath.pow(k.sub(q), FixedPoint.ONE.divDown(_1MinT));
