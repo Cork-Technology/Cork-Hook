@@ -16,12 +16,11 @@ contract SwapMathTest is Test {
         // so that we get 0.9 t
         uint256 current = 3 days;
 
-        uint256 k = SwapMath.getInvariant(xReserve, yReserve, start, end, current);
         uint256 _1MinT = SwapMath.oneMinusT(start, end, current);
 
         vm.assertEq(_1MinT, 0.1 ether);
 
-        uint256 _in = SwapMath.getAmountIn(yOut, xReserve, yReserve, k, _1MinT, 0);
+        uint256 _in = SwapMath.getAmountIn(yOut, xReserve, yReserve, _1MinT, 0);
 
         vm.assertApproxEqAbs(_in, xIn, 0.00001 ether);
     }
@@ -30,7 +29,6 @@ contract SwapMathTest is Test {
         // so that we get 0.9 t
         uint256 current = 3 days;
 
-        uint256 k = SwapMath.getInvariant(xReserve, yReserve, start, end, current);
         uint256 _1MinT = SwapMath.oneMinusT(start, end, current);
 
         vm.assertEq(_1MinT, 0.1 ether);
@@ -38,21 +36,20 @@ contract SwapMathTest is Test {
         //  1% fee
         uint256 fee = 1 ether;
 
-        uint256 _in = SwapMath.getAmountIn(yOut, xReserve, yReserve, k, _1MinT, fee);
+        uint256 _in = SwapMath.getAmountIn(yOut, xReserve, yReserve, _1MinT, fee);
 
-        vm.assertApproxEqAbs(_in, xIn  + 0.009 ether, 0.001 ether);
+        vm.assertApproxEqAbs(_in, xIn + 0.009 ether, 0.001 ether);
     }
 
     function test_amountOutWithoutFee() external pure {
         // so that we get 0.9 t
         uint256 current = 3 days;
 
-        uint256 k = SwapMath.getInvariant(xReserve, yReserve, start, end, current);
         uint256 _1MinT = SwapMath.oneMinusT(start, end, current);
 
         vm.assertEq(_1MinT, 0.1 ether);
 
-        uint256 _out = SwapMath.getAmountOut(xIn, xReserve, yReserve, k, _1MinT, 0);
+        uint256 _out = SwapMath.getAmountOut(xIn, xReserve, yReserve, _1MinT, 0);
 
         vm.assertApproxEqAbs(_out, yOut, 0.00001 ether);
     }
@@ -61,7 +58,6 @@ contract SwapMathTest is Test {
         // so that we get 0.9 t
         uint256 current = 3 days;
 
-        uint256 k = SwapMath.getInvariant(xReserve, yReserve, start, end, current);
         uint256 _1MinT = SwapMath.oneMinusT(start, end, current);
 
         vm.assertEq(_1MinT, 0.1 ether);
@@ -69,7 +65,7 @@ contract SwapMathTest is Test {
         //  1% fee
         uint256 fee = 1 ether;
 
-        uint256 _out = SwapMath.getAmountOut(xIn, xReserve, yReserve, k, _1MinT, fee);
+        uint256 _out = SwapMath.getAmountOut(xIn, xReserve, yReserve, _1MinT, fee);
 
         vm.assertApproxEqAbs(_out, yOut - 0.009 ether, 0.001 ether);
     }
@@ -78,18 +74,17 @@ contract SwapMathTest is Test {
         // so that we get 0.9 t
         uint256 current = 3 days;
 
-        uint256 k = SwapMath.getInvariant(xReserve, yReserve, start, end, current);
         uint256 _1MinT = SwapMath.oneMinusT(start, end, current);
 
         vm.assertEq(_1MinT, 0.1 ether);
 
-        uint256 initOut = SwapMath.getAmountOut(xIn, xReserve, yReserve, k, _1MinT, 0);
-        uint256 initIn = SwapMath.getAmountIn(initOut, xReserve, yReserve, k, _1MinT, 0);
+        uint256 initOut = SwapMath.getAmountOut(xIn, xReserve, yReserve, _1MinT, 0);
+        uint256 initIn = SwapMath.getAmountIn(initOut, xReserve, yReserve, _1MinT, 0);
 
-        uint256 out = SwapMath.getAmountOut(initIn, xReserve, yReserve, k, _1MinT, 0);
+        uint256 out = SwapMath.getAmountOut(initIn, xReserve, yReserve, _1MinT, 0);
         vm.assertEq(initOut, out);
 
-        uint256 in_ = SwapMath.getAmountIn(initOut, xReserve, yReserve, k, _1MinT, 0);
+        uint256 in_ = SwapMath.getAmountIn(initOut, xReserve, yReserve, _1MinT, 0);
         vm.assertEq(initIn, in_);
     }
 
