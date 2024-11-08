@@ -540,9 +540,9 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             revert IErrors.NotEnoughLiquidity();
         }
 
-        (uint256 invariant, uint256 oneMinusT) = _k(self);
+        uint256 oneMinusT = _1MinT(self);
         // TODO : workaround for now, if not for this then the k will decrease slightly than we expected(only work for 1000 :1050 reserve with 1 swao amount at time of 1-t = 0.1)
-        amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, invariant, oneMinusT, self.fee);
+        amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, oneMinusT, self.fee);
     }
 
     function getAmountIn(address ra, address ct, bool raForCt, uint256 amountOut)
@@ -576,8 +576,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             revert IErrors.NotEnoughLiquidity();
         }
 
-        (uint256 invariant, uint256 oneMinusT) = _k(self);
-        amountOut = SwapMath.getAmountOut(amountIn, reserveIn, reserveOut, invariant, oneMinusT, self.fee);
+        uint256 oneMinusT = _1MinT(self);
+        amountOut = SwapMath.getAmountOut(amountIn, reserveIn, reserveOut, oneMinusT, self.fee);
     }
 
     function getAmountOut(address ra, address ct, bool raForCt, uint256 amountIn)
@@ -628,7 +628,12 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         (uint256 start, uint256 end) = _getIssuedAndMaturationTime(self);
 
         invariant = SwapMath.getInvariant(reserve0, reserve1, start, end, block.timestamp);
-        oneMinusT = SwapMath.oneMinusT(start, end, block.timestamp);
+        oneMinusT = _1MinT(self);
+    }
+
+    function _1MinT(PoolState storage self) internal view returns (uint256) {
+        (uint256 start, uint256 end) = _getIssuedAndMaturationTime(self);
+        return SwapMath.oneMinusT(start, end, block.timestamp);
     }
 
     function getPoolKey(address ra, address ct) public view returns (PoolKey memory) {
