@@ -4,6 +4,7 @@ import "v4-periphery/lib/v4-core/src/interfaces/IHooks.sol";
 import "v4-periphery/src/base/SafeCallback.sol";
 import "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
 import "./IErrors.sol";
+import "./../lib/MarketSnapshot.sol";
 
 interface ICorkHook is IErrors {
     function swap(address ra, address ct, uint256 amountRaOut, uint256 amountCtOut, bytes calldata data)
@@ -54,8 +55,10 @@ interface ICorkHook is IErrors {
 
     function getForwarder() external view returns (address);
 
+    function getMarketSnapshot(address ra, address ct) external view returns (MarketSnapshot memory);
+
     event Swapped(
-        address indexed input ,
+        address indexed input,
         address output,
         uint256 amountIn,
         uint256 amountOut,

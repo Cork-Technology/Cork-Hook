@@ -4,6 +4,7 @@ import "./../../Helper.sol";
 import "./../../../src/Constants.sol";
 import "./../../../src/interfaces/CorkSwapCallback.sol";
 import "v4-periphery/lib/v4-core/src/test/PoolSwapTest.sol";
+import "./../../../src/lib/MarketSnapshot.sol";
 
 contract SwapTest is TestHelper {
     uint256 internal constant xReserve = 1000 ether;
@@ -203,6 +204,13 @@ contract SwapTest is TestHelper {
 
         vm.assertEq(balanceAfterToken0 - balanceBeforeToken0, xIn);
         vm.assertApproxEqAbs(balanceBeforeToken1 - balanceAfterToken1, yOut, 0.002 ether);
+    }
+
+    function test_snapshot() external {
+        MarketSnapshot memory snapshot = hook.getMarketSnapshot(address(token0), address(token1));
+        vm.assertEq(snapshot.reserveRa, xReserve);
+        vm.assertEq(snapshot.reserveCt, yReserve);
+        vm.assertEq(snapshot.oneMinusT, 0.1 ether);
     }
 }
 

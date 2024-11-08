@@ -650,4 +650,14 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     function getForwarder() external view returns (address) {
         return address(forwarder);
     }
+
+    function getMarketSnapshot(address ra, address ct) external view returns (MarketSnapshot memory) {
+        PoolState storage self = pool[toAmmId(ra, ct)];
+
+        // sort reserve according user input
+        uint256 raReserve = self.token0 == ra ? self.reserve0 : self.reserve1;
+        uint256 ctReserve = self.token0 == ct ? self.reserve0 : self.reserve1;
+
+        return MarketSnapshot(raReserve, ctReserve, _1MinT(self), self.fee);
+    }
 }
