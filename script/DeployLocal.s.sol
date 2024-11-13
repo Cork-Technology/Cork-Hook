@@ -66,7 +66,13 @@ contract DeployLocalScript is Script, StdCheats {
         require(address(hook) == hookAddress, "Hook address mismatch");
 
         PoolKey memory key = PoolKey(Currency.wrap(address(token0)), Currency.wrap(address(token1)), 0, 1, IHooks(hook));
-        poolManager.initialize(key, SQRT_PRICE_1_1);
+
+        token0.approve(address(hook), 10000 ether);
+        token1.approve(address(hook), 10000 ether);
+        hook.addLiquidity(address(token0), address(token1), 1000 ether, 1050 ether, 0, 0, block.timestamp);
+        address liquidityToken = hook.getLiquidityToken(address(token0), address(token1));
+
+        LiquidityTokenFetcher fetcher = new LiquidityTokenFetcher(hook, address(token0), address(token1));
 
         vm.stopBroadcast();
 
@@ -75,6 +81,29 @@ contract DeployLocalScript is Script, StdCheats {
         console.log("Token0         :", address(token0));
         console.log("Token1         :", address(token1));
         console.log("CorkHook       :", address(hook));
+        console.log("LiquidityToken :", address(liquidityToken));
+        console.log("fetcher        :", address(fetcher));
+    }
+}
+
+contract LiquidityTokenFetcher {
+    CorkHook hook;
+
+    address _token0;
+    address _token1;
+
+    constructor(CorkHook _hook, address token0, address token1) {
+        hook = _hook;
+        token0 = token0;
+        token1 = token1;
+    }
+
+    function getLiquidityToken(address token0, address token1) public view returns (address) {
+        return hook.getLiquidityToken(token0, token1);
+    }
+
+    function getLiquidityToken() public view returns (address) {
+        return hook.getLiquidityToken(_token0, _token1);
     }
 }
 

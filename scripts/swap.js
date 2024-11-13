@@ -9,6 +9,14 @@ const {
   formatEther,
   parseEventLogs,
   publicActions,
+  walletActions,
+  encodeAbiParameters,
+  parseAbiParameter,
+  getAddress,
+  isAddress,
+  parseAbi,
+  decodeAbiParameters,
+  decodeErrorResult,
 } = require("viem");
 const { sepolia, foundry } = require("viem/chains");
 const { privateKeyToAccount } = require("viem/accounts");
@@ -20,6 +28,7 @@ const testClient = createTestClient({
   chain: foundry,
   mode: "anvil",
   transport: http(`http://localhost:8545/`),
+
 });
 
 const anvilAccount1 = privateKeyToAccount(`0x${process.env.ANVIL_ACCOUNT_1}`);
@@ -28,8 +37,9 @@ async function main() {
   console.log("starting script swap.js...");
   const TOKEN_0 = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
   const TOKEN_1 = "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9";
-  const CORK_HOOK = "0x28dc15252E9cd34BDB580fB10C42B876e86a2a88";
+  const CORK_HOOK = "0x0E14326e2e15bDD03aD9b27e12AeCF8E79BD6a88";
   const POOL_MANAGER = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
+  const FETCHER = "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e";
 
   const symbol = await testClient.extend(publicActions).readContract({
     address: TOKEN_0,
@@ -74,17 +84,36 @@ async function main() {
 
   console.log("getForwarder", getForwarder);
 
-  //   get liqiudity token: error starts here
-  const getLiquidityToken = await testClient
-    .extend(publicActions)
-    .readContract({
-      address: CORK_HOOK,
-      abi: CorkAbi,
-      functionName: "getLiquidityToken",
-      args: [TOKEN_0, TOKEN_1],
-    });
+  // //   get liqiudity token: error starts here
+  if (
+    !isAddress(TOKEN_0) || !isAddress(TOKEN_1)
+  ) {
+    throw new Error("Invalid address");
+  }
 
-  console.log("getLiquidityToken", getLiquidityToken);
+  // console.log(decodeErrorResult({
+  //   abi: parseAbi([
+  //     "error PoolNotInitialized()",
+  //     "error CurrenciesOutOfOrderOrEqual(address currency0, address currency1)",
+  //     "error ManagerLocked()",
+  //     "error InvalidCaller()",
+  //     "error ProtocolFeeCannotBeFetched()",
+  //     "error ProtocolFeeTooLarge(uint24 fee)",
+  //     "error ContractUnlocked()",
+  //     "error SwapAmountCannotBeZero()",
+  //     "error NonzeroNativeValue()",
+  //     "error MustClearExactPositiveDelta()",
+  //     "error TickSpacingTooLarge(int24 tickSpacing)",
+  //     "error TickSpacingTooSmall(int24 tickSpacing)",
+  //     "error CurrenciesOutOfOrderOrEqual(address currency0, address currency1)",
+  //     "error Wrap__NativeTransferFailed(address recipient, bytes reason)",
+  //     "error Wrap__ERC20TransferFailed(address token, bytes reason)",
+  //     "error SafeCastOverflow()",
+  //     "error Expired()",
+  //   ]).join(CorkAbi),
+  //   data: "0xec442f05"
+  // }));
+
 
   // get fee error
   // const getFee = await testClient.extend(publicActions).readContract({
@@ -97,18 +126,18 @@ async function main() {
   // console.log("getFee", getFee);
 
   // APPROVE
-  // const approve
-  // const { request: approveToken0 } = await testClient
-  //   .extend(publicActions)
-  //   .simulateContract({
-  //     account: anvilAccount1.address,
-  //     address: TOKEN_0,
-  //     abi: erc20Abi,
-  //     functionName: "approve",
-  //     args: [CORK_HOOK, parseEther("10000")],
-  //   });
+  const { request: approveToken0 } = await testClient
+    .extend(publicActions)
+    .extend(walletActions)
+    .writeContract({
+      account: anvilAccount1.address,
+      address: TOKEN_0,
+      abi: erc20Abi,
+      functionName: "approve",
+      args: [CORK_HOOK, parseEther("10000")],
+    });
 
-  // console.log("approveToken0", approveToken0);
+  console.log("approveToken0", approveToken0);
 
   // const testWrite = testClient.extend(walletActions);
 
@@ -117,24 +146,37 @@ async function main() {
   // console.log("hashApproval", hashApproval);
 
   // ADD LIQUIDITY
-  // const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
 
-  // const addLiquidity = await testClient.extend(publicActions).simulateContract({
-  //   address: CORK_HOOK,
-  //   abi: CorkAbi,
-  //   functionName: "addLiquidity",
-  //   args: [
-  //     TOKEN_0,
-  //     TOKEN_1,
-  //     parseEther("100"),
-  //     parseEther("100"),
-  //     parseEther("0"),
-  //     parseEther("0"),
-  //     deadline,
-  //   ],
-  // });
+  const addLiquidity = await testClient.extend(walletActions).writeContract({
+    account: anvilAccount1.address,
+    address: CORK_HOOK,
+    abi: CorkAbi,
+    functionName: "addLiquidity",
+    args: [
+      TOKEN_0,
+      TOKEN_1,
+      parseEther("1"),
+      parseEther("1"),
+      parseEther("0"),
+      parseEther("0"),
+      deadline,
+    ],
+  });
 
-  // console.log("addLiquidity", addLiquidity);
+  console.log("addLiquidity", addLiquidity);
+
+
+  let getLiquidityToken = await testClient
+    .extend(publicActions)
+    .readContract({
+      address: CORK_HOOK,
+      abi: CorkAbi,
+      functionName: "getLiquidityToken",
+      args: [TOKEN_0, TOKEN_1]
+    })
+  console.log("getLiquidityToken", getLiquidityToken);
+
 
   // const getAmountOut = await testClient.extend(publicActions).readContract({
   //   address: CORK_HOOK,
