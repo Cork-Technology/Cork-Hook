@@ -6,6 +6,7 @@ import {PoolManager} from "v4-core/PoolManager.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "v4-core/types/Currency.sol";
+import {Asset} from "Depeg-swap/contracts/core/assets/Asset.sol";
 
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 
@@ -20,11 +21,14 @@ contract DeployLocalScript is Script, StdCheats {
     uint256 internal constant pk = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
     address internal user = vm.addr(pk);
     address internal constant CREATE_2_PROXY = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+    uint256 expiry = block.timestamp + 10 days;
+    // irrelevant
+    uint256 rate = 1000;
 
     PoolManager poolManager;
 
-    DummyErc20 token0;
-    DummyErc20 token1;
+    Asset token0;
+    Asset token1;
 
     LiquidityToken lpBase;
     CorkHook hook;
@@ -40,11 +44,8 @@ contract DeployLocalScript is Script, StdCheats {
         vm.startBroadcast(pk);
 
         poolManager = new PoolManager();
-        token0 = new DummyErc20();
-        token1 = new DummyErc20();
-
-        token0.initialize("Token0", "TK0", 18);
-        token1.initialize("Token1", "TK1", 18);
+        token0 = new Asset("TK", "0", user, expiry, rate);
+        token1 = new Asset("TK", "1", user, expiry, rate);
 
         token0.mint(user, type(uint256).max);
         token1.mint(user, type(uint256).max);
