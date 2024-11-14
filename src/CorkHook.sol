@@ -658,6 +658,6 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         uint256 raReserve = self.token0 == ra ? self.reserve0 : self.reserve1;
         uint256 ctReserve = self.token0 == ct ? self.reserve0 : self.reserve1;
 
-        return MarketSnapshot(raReserve, ctReserve, _1MinT(self), self.fee);
+        return MarketSnapshot(raReserve, ctReserve, _1MinT(self), self.fee, address(self.liquidityToken));
     }
 }
