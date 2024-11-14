@@ -14,7 +14,7 @@
 
 pragma solidity ^0.8.0;
 
-import "./BalancerErrors.sol";
+import "./Errors.sol";
 
 /* solhint-disable */
 
