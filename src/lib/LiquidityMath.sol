@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "openzeppelin-contracts/contracts/utils/math/Math.sol";
 import "./../interfaces/IErrors.sol";
-import "./balancers/FixedPoint.sol";
+import "./primitives/FixedPoint.sol";
 
 library LiquidityMath {
     using FixedPoint for uint256;

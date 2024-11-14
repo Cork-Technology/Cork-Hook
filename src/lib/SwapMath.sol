@@ -1,7 +1,6 @@
 pragma solidity ^0.8.0;
 
-import "./balancers/FixedPoint.sol";
-import "forge-std/console.sol";
+import "./primitives/FixedPoint.sol";
 
 library SwapMath {
     using FixedPoint for uint256;
