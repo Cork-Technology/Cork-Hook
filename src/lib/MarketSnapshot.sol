@@ -11,7 +11,7 @@ struct MarketSnapshot {
 }
 
 library MarketSnapshotLib {
-    function getAmountOut(MarketSnapshot memory self, uint256 amountIn, bool raForCt) public pure returns (uint256 amountOut) {
+    function getAmountOut(MarketSnapshot memory self, uint256 amountIn, bool raForCt) internal pure returns (uint256 amountOut) {
         if (raForCt) {
             return SwapMath.getAmountOut(amountIn, self.reserveRa, self.reserveCt, self.oneMinusT, self.baseFee);
         } else {
@@ -19,7 +19,7 @@ library MarketSnapshotLib {
         }
     }
 
-    function getAmountIn(MarketSnapshot memory self, uint256 amountOut, bool raForCt) public pure returns (uint256 amountIn) {
+    function getAmountIn(MarketSnapshot memory self, uint256 amountOut, bool raForCt) internal pure returns (uint256 amountIn) {
         if (raForCt) {
             return SwapMath.getAmountIn(amountOut, self.reserveRa, self.reserveCt, self.oneMinusT, self.baseFee);
         } else {
