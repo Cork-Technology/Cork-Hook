@@ -73,6 +73,8 @@ struct PoolState {
     LiquidityToken liquidityToken;
     // base fee in 18 decimals, 1% is 1e18\
     uint256 fee;
+    uint256 startTimestamp;
+    uint256 endTimestamp;
 }
 
 library PoolStateLibrary {

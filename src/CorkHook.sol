@@ -112,7 +112,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         // check for the token to be valid, i.e have expiry
         {
             PoolState storage self = pool[ammId];
-            _getIssuedAndMaturationTime(self);
+            _saveIssuedAndMaturationTime(self);
         }
 
         // the reason we just concatenate the addresses instead of their respective symbols is that because this way, we don't need to worry about
@@ -604,23 +604,27 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         return (Currency.wrap(_input), Currency.wrap(_output));
     }
 
-    function _getIssuedAndMaturationTime(PoolState storage self) internal view returns (uint256 start, uint256 end) {
+    function _saveIssuedAndMaturationTime(PoolState storage self) internal {
         IExpiry token0 = IExpiry(self.token0);
         IExpiry token1 = IExpiry(self.token1);
 
         try token0.issuedAt() returns (uint256 issuedAt0) {
-            start = issuedAt0;
-            end = token0.expiry();
-            return (start, end);
+            self.startTimestamp = issuedAt0;
+            self.endTimestamp = token0.expiry();
+            return;
         } catch {}
 
         try token1.issuedAt() returns (uint256 issuedAt1) {
-            start = issuedAt1;
-            end = token1.expiry();
-            return (start, end);
+            self.startTimestamp = issuedAt1;
+            self.endTimestamp = token1.expiry();
+            return;
         } catch {}
 
         revert IErrors.InvalidToken();
+    }
+
+    function _getIssuedAndMaturationTime(PoolState storage self) internal view returns (uint256 start, uint256 end) {
+        return (self.startTimestamp, self.endTimestamp);
     }
 
     function _k(PoolState storage self) internal view returns (uint256 invariant, uint256 oneMinusT) {
