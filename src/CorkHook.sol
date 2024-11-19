@@ -522,7 +522,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         self.updateReserves(Currency.unwrap(input), amountIn, false);
 
         // settle swap, i.e we take the input token from the pool manager, the debt will be payed by the user, at this point, the user should've created a debit on the PM
-        input.take(poolManager, sender, amountIn, true);
+        input.take(poolManager, address(this), amountIn, true);
 
         // this is similar to normal swap, the unspecified amount is the other tokens
         // if exact in, the hook must goes into "debt" equal to amount out
