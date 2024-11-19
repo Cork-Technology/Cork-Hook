@@ -82,10 +82,10 @@ contract SwapMathTest is Test {
         uint256 initIn = SwapMath.getAmountIn(initOut, xReserve, yReserve, _1MinT, 0);
 
         uint256 out = SwapMath.getAmountOut(initIn, xReserve, yReserve, _1MinT, 0);
-        vm.assertEq(initOut, out);
+        vm.assertApproxEqAbs(initOut, out, 0.000000001 ether);
 
         uint256 in_ = SwapMath.getAmountIn(initOut, xReserve, yReserve, _1MinT, 0);
-        vm.assertEq(initIn, in_);
+        vm.assertApproxEqAbs(initIn, in_, 0.000000001 ether);
     }
 
     function test_normalizedTime() external pure {

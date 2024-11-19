@@ -3,7 +3,6 @@ pragma solidity 0.8.26;
 import {LiquidityMath} from "./LiquidityMath.sol";
 import {LiquidityToken} from "./../LiquidityToken.sol";
 import {Currency} from "v4-periphery/lib/v4-core/src/types/Currency.sol";
-import "./primitives/FixedPoint.sol";
 import "./../interfaces/IErrors.sol";
 
 /// @notice amm id,
@@ -78,7 +77,7 @@ struct PoolState {
 }
 
 library PoolStateLibrary {
-    uint256 constant MAX_FEE = FixedPoint.ONE * 100;
+    uint256 constant MAX_FEE = 100e18;
 
     function ensureLiquidityEnough(PoolState storage state, uint256 amountOut, address token) internal view {
         if (token == state.token0 && state.reserve0 < amountOut) {
