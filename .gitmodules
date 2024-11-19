@@ -13,3 +13,6 @@
 [submodule "lib/Depeg-swap"]
 	path = lib/Depeg-swap
 	url = https://github.com/Cork-Technology/Depeg-swap
+[submodule "lib/prb-math"]
+	path = lib/prb-math
+	url = https://github.com/PaulRBerg/prb-math

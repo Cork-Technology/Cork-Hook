@@ -1,4 +1,4 @@
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 library SenderSlot {
     /// @notice used to store the current caller address when swapping tokens from the hook, since

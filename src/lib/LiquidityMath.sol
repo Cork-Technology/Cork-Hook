@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
-import "openzeppelin-contracts/contracts/utils/math/Math.sol";
+import {UD60x18, convert, ud, add, mul, pow, sub, div, unwrap, intoSD59x18, sqrt} from "@prb/math/src/UD60x18.sol";
 import "./../interfaces/IErrors.sol";
-import "./primitives/FixedPoint.sol";
 
 library LiquidityMath {
-    using FixedPoint for uint256;
-
     // Adding Liquidity (Pure Function)
     // caller of this contract must ensure the both amount is already proportional in amount!
     function addLiquidity(
@@ -28,15 +25,15 @@ library LiquidityMath {
         // Calculate the liquidity tokens minted based on the added amounts and the current reserves
         if (totalLiquidity == 0) {
             // Initial liquidity provision (sqrt of product of amounts added)
-            liquidityMinted = Math.sqrt(amount0 * amount1);
+            liquidityMinted = unwrap(sqrt(mul(ud(amount0), ud(amount1))));
         } else {
             // Mint liquidity proportional to the added amounts
-            liquidityMinted = (amount0 * totalLiquidity) / reserve0;
+            liquidityMinted = unwrap(div(mul((ud(amount0)), ud(totalLiquidity)), ud(reserve0)));
         }
 
         // Update reserves
-        newReserve0 = reserve0 + amount0;
-        newReserve1 = reserve1 + amount1;
+        newReserve0 = unwrap(add(ud(reserve0), ud(amount0)));
+        newReserve1 = unwrap(add(ud(reserve1), ud(amount1)));
 
         return (newReserve0, newReserve1, liquidityMinted);
     }
@@ -46,7 +43,7 @@ library LiquidityMath {
         pure
         returns (uint256 amount1)
     {
-        return amount0.mulDown(reserve1).divDown(reserve0);
+        return unwrap(div(mul(ud(amount0), ud(reserve1)), ud(reserve0)));
     }
 
     // uni v2 style proportional add liquidity
@@ -104,12 +101,14 @@ library LiquidityMath {
         }
 
         // Calculate the proportion of reserves to return based on the liquidity removed
-        amount0 = (liquidityAmount * reserve0) / totalLiquidity;
-        amount1 = (liquidityAmount * reserve1) / totalLiquidity;
+        amount0 = unwrap(div(mul(ud(liquidityAmount), ud(reserve0)), ud(totalLiquidity)));
+
+        amount1 = unwrap(div(mul(ud(liquidityAmount), ud(reserve1)), ud(totalLiquidity)));
 
         // Update reserves after removing liquidity
-        newReserve0 = reserve0 - amount0;
-        newReserve1 = reserve1 - amount1;
+        newReserve0 = unwrap(sub(ud(reserve0), ud(amount0)));
+
+        newReserve1 = unwrap(sub(ud(reserve1), ud(amount1)));
 
         return (amount0, amount1, newReserve0, newReserve1);
     }
