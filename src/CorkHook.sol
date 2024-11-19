@@ -249,22 +249,36 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         {
             (,, uint256 amount0min, uint256 amount1min) = sort(ra, ct, amountRamin, amountCtmin);
             // check and returns how much lp minted
+            // we use the return argument as container here but amountRa is actually token0 used right now
+            // we stay it like this to avoid stack too deep errors and because we need the actual amount used to transfer from user
             (,, mintedLp, amountRa, amountCt) =
                 self.tryAddLiquidity(sortResult.amount0, sortResult.amount1, amount0min, amount1min);
-
-            (amountRa, amountCt) = ra == sortResult.token0 ? (amountRa, amountCt) : (amountCt, amountRa);
         }
 
         {
-            AddLiquidtyParams memory params = AddLiquidtyParams(
-                sortResult.token0, sortResult.amount0, sortResult.token1, sortResult.amount1, msg.sender
-            );
+            // we use the previously used amount here
+            AddLiquidtyParams memory params =
+                AddLiquidtyParams(sortResult.token0, amountRa, sortResult.token1, amountCt, msg.sender);
+
+            // now we actually sort back the tokens
+            (amountRa, amountCt) = ra == sortResult.token0 ? (amountRa, amountCt) : (amountCt, amountRa);
+
             bytes memory data = abi.encode(Action.AddLiquidity, params);
 
             poolManager.unlock(data);
         }
 
         emit ICorkHook.AddedLiquidity(ra, ct, amountRa, amountCt, mintedLp, msg.sender);
+    }
+
+    function _refundExcess(address ra, address ct, uint256 amountRa, uint256 amountCt) internal {
+        if (amountRa > 0) {
+            IERC20(ra).transfer(msg.sender, amountRa);
+        }
+
+        if (amountCt > 0) {
+            IERC20(ct).transfer(msg.sender, amountCt);
+        }
     }
 
     function removeLiquidity(
