@@ -1,9 +1,8 @@
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
+import {UD60x18, convert, ud, add, mul, pow, sub, div, unwrap, intoSD59x18} from "@prb/math/src/UD60x18.sol";
 
-import "./primitives/FixedPoint.sol";
 
 library SwapMath {
-    using FixedPoint for uint256;
 
     /// @notice minimum 1-t to not div by 0
     uint256 public constant MINIMUM_ELAPSED = 1;

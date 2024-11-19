@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
-import "openzeppelin-contracts/contracts/utils/math/Math.sol";
+import {UD60x18, convert, ud, add, mul, pow, sub, div, unwrap, intoSD59x18, sqrt} from "@prb/math/src/UD60x18.sol";
 import "./../interfaces/IErrors.sol";
-import "./primitives/FixedPoint.sol";
 
 library LiquidityMath {
-    using FixedPoint for uint256;
-
     // Adding Liquidity (Pure Function)
     // caller of this contract must ensure the both amount is already proportional in amount!
     function addLiquidity(
@@ -29,6 +26,7 @@ library LiquidityMath {
         if (totalLiquidity == 0) {
             // Initial liquidity provision (sqrt of product of amounts added)
             liquidityMinted = Math.sqrt(amount0 * amount1);
+            liquidityMinted = convert(sqrt(mul(convert(amount0), convert(amount1))));
         } else {
             // Mint liquidity proportional to the added amounts
             liquidityMinted = (amount0 * totalLiquidity) / reserve0;
