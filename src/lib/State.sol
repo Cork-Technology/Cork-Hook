@@ -79,6 +79,9 @@ struct PoolState {
 library PoolStateLibrary {
     uint256 constant MAX_FEE = 100e18;
 
+    /// to prevent price manipulation at the start of the pool
+    uint256 constant MINIMUM_LIQUIDITY = 1e4;
+
     function ensureLiquidityEnough(PoolState storage state, uint256 amountOut, address token) internal view {
         if (token == state.token0 && state.reserve0 < amountOut) {
             revert IErrors.NotEnoughLiquidity();
@@ -141,6 +144,11 @@ library PoolStateLibrary {
         (reserve0, reserve1, mintedLp) = LiquidityMath.addLiquidity(
             state.reserve0, state.reserve1, state.liquidityToken.totalSupply(), amount0, amount1
         );
+
+        // we lock minimum liquidity to prevent price manipulation at the start of the pool
+        if (state.reserve0 == 0 && state.reserve1 == 0) {
+            mintedLp -= MINIMUM_LIQUIDITY;
+        }
     }
 
     function addLiquidity(
@@ -156,6 +164,11 @@ library PoolStateLibrary {
     {
         (reserve0, reserve1, mintedLp, amount0Used, amount1Used) =
             tryAddLiquidity(state, amount0, amount1, amount0min, amount1min);
+
+        // we lock minimum liquidity to prevent price manipulation at the start of the pool
+        if (state.reserve0 == 0 && state.reserve1 == 0) {
+            state.liquidityToken.mint(address(0xd3ad), MINIMUM_LIQUIDITY);
+        }
 
         state.reserve0 = reserve0;
         state.reserve1 = reserve1;
