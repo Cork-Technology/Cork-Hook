@@ -58,11 +58,11 @@ contract DeployLocalScript is Script, StdCheats {
         lpBase = new LiquidityToken();
 
         bytes memory creationCode = type(CorkHook).creationCode;
-        bytes memory args = abi.encode(poolManager, lpBase);
+        bytes memory args = abi.encode(poolManager, lpBase, user);
 
         (address hookAddress, bytes32 salt) = HookMiner.find(CREATE_2_PROXY, flags, creationCode, args);
 
-        hook = new CorkHook{salt: salt}(poolManager, lpBase);
+        hook = new CorkHook{salt: salt}(poolManager, lpBase, user);
         require(address(hook) == hookAddress, "Hook address mismatch");
 
         PoolKey memory key = PoolKey(Currency.wrap(address(token0)), Currency.wrap(address(token1)), 0, 1, IHooks(hook));

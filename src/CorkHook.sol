@@ -46,7 +46,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     address lpBase;
     HookForwarder forwarder;
 
-    constructor(IPoolManager _poolManager, LiquidityToken _lpBase) BaseHook(_poolManager) Ownable(msg.sender) {
+    constructor(IPoolManager _poolManager, LiquidityToken _lpBase, address owner) BaseHook(_poolManager) Ownable(owner) {
         lpBase = address(_lpBase);
         forwarder = new HookForwarder(_poolManager);
     }
@@ -219,10 +219,10 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         token1.take(poolManager, sender, amount1, false);
     }
 
+    // we dont check for initialization here since we want to pre init the fee
     function updateBaseFeePercentage(address ra, address ct, uint256 baseFeePercentage)
         external
         onlyOwner
-        onlyInitialized(ra, ct)
     {
         pool[toAmmId(ra, ct)].fee = baseFeePercentage;
     }
