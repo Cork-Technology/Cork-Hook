@@ -17,7 +17,7 @@ import {IHooks} from "v4-periphery/lib/v4-core/src/interfaces/IHooks.sol";
 contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
     using CurrencyLibrary for Currency;
 
-    IPoolManager internal poolManager;
+    IPoolManager immutable internal poolManager;
 
     constructor(IPoolManager _poolManager) Ownable(msg.sender) {
         poolManager = _poolManager;

@@ -40,8 +40,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     mapping(AmmId => PoolState) internal pool;
 
     // we will deploy proxy to this address for each pool
-    address internal lpBase;
-    HookForwarder internal forwarder;
+    address immutable internal lpBase;
+    HookForwarder immutable internal forwarder;
 
     constructor(IPoolManager _poolManager, LiquidityToken _lpBase, address owner)
         BaseHook(_poolManager)
