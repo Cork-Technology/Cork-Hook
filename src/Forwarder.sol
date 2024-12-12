@@ -1,17 +1,16 @@
 pragma solidity ^0.8.20;
 
-import "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
+import {PoolKey} from "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "v4-core/types/Currency.sol";
 import {CurrencySettler} from "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
-
-import "openzeppelin-contracts/contracts/access/Ownable.sol";
-import "v4-periphery/lib/v4-core/src/interfaces/IPoolManager.sol";
-import "./Constants.sol";
-import "./lib/Calls.sol";
-import {IERC20} from "openzeppelin-contracts/contracts/interfaces/IERC20.sol";
-import "./interfaces/CorkSwapCallback.sol";
-import "./lib/SenderSlot.sol";
-import "./interfaces/IErrors.sol";
+import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {IPoolManager} from "v4-periphery/lib/v4-core/src/interfaces/IPoolManager.sol";
+import {Constants} from "./Constants.sol";
+import {SwapParams} from "./lib/Calls.sol";
+import {CorkSwapCallback} from "./interfaces/CorkSwapCallback.sol";
+import {SenderSlot} from "./lib/SenderSlot.sol";
+import {IErrors} from "./interfaces/IErrors.sol";
+import {IHooks} from "v4-periphery/lib/v4-core/src/interfaces/IHooks.sol";
 
 /// @title PoolInitializer
 /// workaround contract to auto initialize pool & swap when adding liquidity since uni v4 doesn't support self calling from hook

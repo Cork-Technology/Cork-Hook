@@ -36,7 +36,7 @@ interface IErrors {
 
     /// @notice trying to remove liquidity, but the liquidity removed is less than what expected
     error InsufficientOutputAmout();
-    
+
     /// @notice deadline has passed
     error Deadline();
 

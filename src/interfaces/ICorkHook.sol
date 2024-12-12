@@ -1,10 +1,8 @@
 pragma solidity ^0.8.20;
 
-import "v4-periphery/lib/v4-core/src/interfaces/IHooks.sol";
-import "v4-periphery/src/base/SafeCallback.sol";
-import "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
-import "./IErrors.sol";
-import "./../lib/MarketSnapshot.sol";
+import {PoolKey} from "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
+import {IErrors} from "./IErrors.sol";
+import {MarketSnapshot} from "./../lib/MarketSnapshot.sol";
 
 interface ICorkHook is IErrors {
     function swap(address ra, address ct, uint256 amountRaOut, uint256 amountCtOut, bytes calldata data)
