@@ -77,10 +77,10 @@ struct PoolState {
 }
 
 library PoolStateLibrary {
-    uint256 constant MAX_FEE = 100e18;
+    uint256 constant internal MAX_FEE = 100e18;
 
     /// to prevent price manipulation at the start of the pool
-    uint256 constant MINIMUM_LIQUIDITY = 1e4;
+    uint256 constant internal MINIMUM_LIQUIDITY = 1e4;
 
     function ensureLiquidityEnough(PoolState storage state, uint256 amountOut, address token) internal view {
         if (token == state.token0 && state.reserve0 < amountOut) {

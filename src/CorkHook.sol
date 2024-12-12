@@ -40,8 +40,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     mapping(AmmId => PoolState) internal pool;
 
     // we will deploy proxy to this address for each pool
-    address lpBase;
-    HookForwarder forwarder;
+    address internal lpBase;
+    HookForwarder internal forwarder;
 
     constructor(IPoolManager _poolManager, LiquidityToken _lpBase, address owner)
         BaseHook(_poolManager)
@@ -408,8 +408,6 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         unspecificiedAmount = exactIn ? -int256(amountOut) : int256(amountIn);
 
         (Currency input, Currency output) = _getInputOutput(self, params.zeroForOne);
-
-        (uint256 kBefore,) = _k(self);
 
         self.ensureLiquidityEnough(amountOut, Currency.unwrap(output));
 

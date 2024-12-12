@@ -17,7 +17,7 @@ import {IHooks} from "v4-periphery/lib/v4-core/src/interfaces/IHooks.sol";
 contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
     using CurrencyLibrary for Currency;
 
-    IPoolManager poolManager;
+    IPoolManager internal poolManager;
 
     constructor(IPoolManager _poolManager) Ownable(msg.sender) {
         poolManager = _poolManager;
@@ -42,10 +42,6 @@ contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
 
     function swap(SwapParams calldata params) external onlyOwner {
         SenderSlot.set(params.sender);
-
-        address token0 = Currency.unwrap(params.poolKey.currency0);
-        address token1 = Currency.unwrap(params.poolKey.currency1);
-
         poolManager.swap(params.poolKey, params.params, params.swapData);
     }
 
