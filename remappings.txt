@@ -1,8 +1,6 @@
 @ensdomains/=lib/v4-periphery/lib/v4-core/node_modules/@ensdomains/
-
 @openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
-
 @uniswap/v4-core/=lib/v4-periphery/lib/v4-core/
 ds-test/=lib/openzeppelin-contracts-upgradeable/lib/forge-std/lib/ds-test/src/
 erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/

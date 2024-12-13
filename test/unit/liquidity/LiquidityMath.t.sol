@@ -2,7 +2,6 @@ pragma solidity ^0.8.0;
 
 import "./../../../src/lib/LiquidityMath.sol";
 import "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 contract LiquidityMathTest is Test {
     function test_addLiquidityFirst() external {

@@ -1,6 +1,5 @@
 pragma solidity 0.8.26;
 
-// TODO : refactor named imports
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Strings} from "openzeppelin-contracts/contracts/utils/Strings.sol";
@@ -13,22 +12,20 @@ import {BaseHook} from "v4-periphery/src/base/hooks/BaseHook.sol";
 import {CurrencySettler} from "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
 import {LiquidityToken} from "./LiquidityToken.sol";
 import {Action, AddLiquidtyParams, RemoveLiquidtyParams} from "./lib/Calls.sol";
-import "./lib/State.sol";
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import "openzeppelin-contracts/contracts/utils/Strings.sol";
-import "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
-import "./lib/Calls.sol";
-import "./lib/SwapMath.sol";
-import "Depeg-swap/contracts/interfaces/IExpiry.sol";
-import "./interfaces/CorkSwapCallback.sol";
-import "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {SwapMath} from "./lib/SwapMath.sol";
+import {IExpiry} from "Depeg-swap/contracts/interfaces/IExpiry.sol";
+import {CorkSwapCallback} from "./interfaces/CorkSwapCallback.sol";
+import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {HookForwarder} from "./Forwarder.sol";
-import "./Constants.sol";
+import {Constants} from "./Constants.sol";
+import {IErrors} from "./interfaces/IErrors.sol";
+import {ICorkHook} from "./interfaces/ICorkHook.sol";
+import {MarketSnapshot} from "./lib/MarketSnapshot.sol";
+import {IHooks} from "v4-periphery/lib/v4-core/src/interfaces/IHooks.sol";
+
+import "./lib/State.sol";
+import "./lib/Calls.sol";
 import "v4-periphery/lib/v4-core/src/types/BeforeSwapDelta.sol";
-import "./lib/SenderSlot.sol";
-import "./interfaces/IErrors.sol";
-import "./interfaces/ICorkHook.sol";
-import "forge-std/console.sol";
 
 // TODO : make documentation on how to properly initialize the pool
 // TODO : create events
@@ -43,10 +40,13 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     mapping(AmmId => PoolState) internal pool;
 
     // we will deploy proxy to this address for each pool
-    address lpBase;
-    HookForwarder forwarder;
+    address immutable internal lpBase;
+    HookForwarder immutable internal forwarder;
 
-    constructor(IPoolManager _poolManager, LiquidityToken _lpBase, address owner) BaseHook(_poolManager) Ownable(owner) {
+    constructor(IPoolManager _poolManager, LiquidityToken _lpBase, address owner)
+        BaseHook(_poolManager)
+        Ownable(owner)
+    {
         lpBase = address(_lpBase);
         forwarder = new HookForwarder(_poolManager);
     }
@@ -220,10 +220,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     }
 
     // we dont check for initialization here since we want to pre init the fee
-    function updateBaseFeePercentage(address ra, address ct, uint256 baseFeePercentage)
-        external
-        onlyOwner
-    {
+    function updateBaseFeePercentage(address ra, address ct, uint256 baseFeePercentage) external onlyOwner {
         pool[toAmmId(ra, ct)].fee = baseFeePercentage;
     }
 
@@ -411,8 +408,6 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         unspecificiedAmount = exactIn ? -int256(amountOut) : int256(amountIn);
 
         (Currency input, Currency output) = _getInputOutput(self, params.zeroForOne);
-
-        (uint256 kBefore,) = _k(self);
 
         self.ensureLiquidityEnough(amountOut, Currency.unwrap(output));
 

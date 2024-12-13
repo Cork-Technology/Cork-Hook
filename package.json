@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "cloc": "^2.2.0-cloc",
+    "solhint": "^5.0.3"
+  }
+}
