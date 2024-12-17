@@ -63,6 +63,17 @@ function sortPacked(address a, address b) pure returns (SortResult memory) {
     return SortResult(token0, token1, 0, 0);
 }
 
+function settleNormalized() internal {
+    // TODO
+}
+
+function takeNormalized() internal {
+    // TODO
+}
+
+/// @notice Pool state
+/// all reserve are stored in 18 decimals format regardless of the token decimals
+/// all conversion happen internally, and user must use amount in their token respective decimals
 struct PoolState {
     uint256 reserve0;
     uint256 reserve1;
@@ -77,10 +88,10 @@ struct PoolState {
 }
 
 library PoolStateLibrary {
-    uint256 constant internal MAX_FEE = 100e18;
+    uint256 internal constant MAX_FEE = 100e18;
 
     /// to prevent price manipulation at the start of the pool
-    uint256 constant internal MINIMUM_LIQUIDITY = 1e4;
+    uint256 internal constant MINIMUM_LIQUIDITY = 1e4;
 
     function ensureLiquidityEnough(PoolState storage state, uint256 amountOut, address token) internal view {
         if (token == state.token0 && state.reserve0 < amountOut) {

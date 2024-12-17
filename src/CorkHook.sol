@@ -154,7 +154,6 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             PoolState storage self = pool[toAmmId(sortResult.token0, sortResult.token1)];
             amountIn = _getAmountIn(self, zeroForOne, out);
         }
-        // all sanitiy check should go here
 
         bytes memory swapData;
         IPoolManager.SwapParams memory ammSwapParams;
