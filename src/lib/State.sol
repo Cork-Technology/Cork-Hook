@@ -4,6 +4,10 @@ import {LiquidityMath} from "./LiquidityMath.sol";
 import {LiquidityToken} from "./../LiquidityToken.sol";
 import {Currency} from "v4-periphery/lib/v4-core/src/types/Currency.sol";
 import {IErrors} from "./../interfaces/IErrors.sol";
+import {Currency} from "v4-periphery/lib/v4-core/src/types/Currency.sol";
+import {CurrencySettler} from "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
+import {IPoolManager} from "v4-periphery/lib/v4-core/src/interfaces/IPoolManager.sol";
+import {TransferHelper} from "Depeg-swap/contracts/libraries/TransferHelper.sol";
 
 /// @notice amm id,
 type AmmId is bytes32;
@@ -63,12 +67,31 @@ function sortPacked(address a, address b) pure returns (SortResult memory) {
     return SortResult(token0, token1, 0, 0);
 }
 
-function settleNormalized() internal {
-    // TODO
+/// @notice settle tokens from the pool manager, all numbers are fixed point 18 decimals on the hook
+/// so this function is expected to be used on every "settle" action
+function settleNormalized(Currency currency, IPoolManager manager, address payer, uint256 amount, bool burn) {
+    amount = TransferHelper.fixedToTokenNativeDecimals(amount, Currency.unwrap(currency));
+    CurrencySettler.settle(currency, manager, payer, amount, burn);
 }
 
-function takeNormalized() internal {
-    // TODO
+/// @notice take tokens from the pool manager, all numbers are fixed point 18 decimals on the hook
+/// so this function is expected to be used on every "take" action
+function takeNormalized(Currency currency, IPoolManager manager, address recipient, uint256 amount, bool claims) {
+    amount = TransferHelper.fixedToTokenNativeDecimals(amount, Currency.unwrap(currency));
+    CurrencySettler.take(currency, manager, recipient, amount, claims);
+}
+
+function normalize(SortResult memory result) view returns (SortResult memory) {
+    return SortResult(
+        result.token0,
+        result.token1,
+        TransferHelper.tokenNativeDecimalsToFixed(result.amount0, result.token0),
+        TransferHelper.tokenNativeDecimalsToFixed(result.amount1, result.token1)
+    );
+}
+
+function normalize(address token, uint256 amount) view returns (uint256) {
+    return TransferHelper.tokenNativeDecimalsToFixed(amount, token);
 }
 
 /// @notice Pool state

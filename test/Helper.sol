@@ -38,8 +38,8 @@ contract TestHelper is Test, Deployers {
 
         poolManager = IPoolManager(manager);
 
-        token0 = new Asset("AA", "ABAB", address(this), expiry(), 0);
-        token1 = new Asset("AA", "ABAB", address(this), expiry(), 0);
+        token0 = new Asset("AA", "ABAB", address(this), expiry(), 0, 1);
+        token1 = new Asset("AA", "ABAB", address(this), expiry(), 0, 1);
 
         //sort
         if (address(token0) > address(token1)) {
