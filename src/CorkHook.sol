@@ -309,6 +309,9 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         (uint256 amount0, uint256 amount1,,) = self.tryRemoveLiquidity(liquidityAmount);
         (,, amountRa, amountCt) = reverseSortWithAmount(ra, ct, sortResult.token0, sortResult.token1, amount0, amount1);
 
+        amountRa = toNative(ra, amountRa);
+        amountCt = toNative(ct, amountCt);
+        
         if (amountRa < amountRamin || amountCt < amountCtmin) {
             revert IErrors.InsufficientOutputAmout();
         }
