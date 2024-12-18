@@ -265,6 +265,10 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             // now we actually sort back the tokens
             (amountRa, amountCt) = ra == sortResult.token0 ? (amountRa, amountCt) : (amountCt, amountRa);
 
+            // we convert the amount to the native decimals to reflect the actual amount when returning
+            amountRa = toNative(ra, amountRa);
+            amountCt = toNative(ct, amountCt);
+
             bytes memory data = abi.encode(Action.AddLiquidity, params);
 
             poolManager.unlock(data);
@@ -688,13 +692,19 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         return address(forwarder);
     }
 
-    function getMarketSnapshot(address ra, address ct) external view returns (MarketSnapshot memory) {
+    function getMarketSnapshot(address ra, address ct) external view returns (MarketSnapshot memory snapshot) {
         PoolState storage self = pool[toAmmId(ra, ct)];
 
         // sort reserve according user input
         uint256 raReserve = self.token0 == ra ? self.reserve0 : self.reserve1;
         uint256 ctReserve = self.token0 == ct ? self.reserve0 : self.reserve1;
 
-        return MarketSnapshot(raReserve, ctReserve, _1MinT(self), self.fee, address(self.liquidityToken));
+        snapshot.baseFee = self.fee;
+        snapshot.liquidityToken = address(self.liquidityToken);
+        snapshot.oneMinusT = _1MinT(self);
+        snapshot.ra = ra;
+        snapshot.ct = ct;
+        snapshot.reserveRa = raReserve;
+        snapshot.reserveCt = ctReserve;
     }
 }

@@ -48,6 +48,7 @@ contract TestHelper is Test, Deployers {
     );
 
     address DEFAULT_ADDRESS = address(69);
+    uint8 DEFAULT_DECIMALS = 18;
 
     function expiry() internal pure virtual returns (uint256) {
         return 0;
