@@ -94,6 +94,20 @@ function normalize(address token, uint256 amount) view returns (uint256) {
     return TransferHelper.tokenNativeDecimalsToFixed(amount, token);
 }
 
+function normalize(Currency _token, uint256 amount) view returns (uint256) {
+    address token = Currency.unwrap(_token);
+    return TransferHelper.tokenNativeDecimalsToFixed(amount, token);
+}
+
+function toNative(Currency _token, uint256 amount) view returns (uint256) {
+    address token = Currency.unwrap(_token);
+    return TransferHelper.fixedToTokenNativeDecimals(amount, token);
+}
+
+function toNative(address token, uint256 amount) view returns (uint256) {
+    return TransferHelper.fixedToTokenNativeDecimals(amount, token);
+}
+
 /// @notice Pool state
 /// all reserve are stored in 18 decimals format regardless of the token decimals
 /// all conversion happen internally, and user must use amount in their token respective decimals

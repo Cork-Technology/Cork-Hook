@@ -11,13 +11,14 @@ import {CorkSwapCallback} from "./interfaces/CorkSwapCallback.sol";
 import {SenderSlot} from "./lib/SenderSlot.sol";
 import {IErrors} from "./interfaces/IErrors.sol";
 import {IHooks} from "v4-periphery/lib/v4-core/src/interfaces/IHooks.sol";
+import "./lib/State.sol";
 
 /// @title PoolInitializer
 /// workaround contract to auto initialize pool & swap when adding liquidity since uni v4 doesn't support self calling from hook
 contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
     using CurrencyLibrary for Currency;
 
-    IPoolManager immutable internal poolManager;
+    IPoolManager internal immutable poolManager;
 
     constructor(IPoolManager _poolManager) Ownable(msg.sender) {
         poolManager = _poolManager;
@@ -60,8 +61,8 @@ contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
             revert IErrors.NoSender();
         }
 
-        CurrencySettler.take(out, poolManager, to, amountOut, false);
-        CurrencySettler.settle(_in, poolManager, address(this), amountIn, false);
+        takeNormalized(out, poolManager, to, amountOut, false);
+        settleNormalized(_in, poolManager, address(this), amountIn, false);
     }
 
     function getCurrentSender() external view returns (address) {
@@ -77,7 +78,7 @@ contract HookForwarder is Ownable, CorkSwapCallback, IErrors {
             revert IErrors.NoSender();
         }
 
-        CurrencySettler.take(out, poolManager, sender, amountOut, false);
+        takeNormalized(out, poolManager, sender, amountOut, false);
     }
 
     /// @notice we're just forwarding the call to the callback contract

@@ -154,6 +154,12 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             amountIn = _getAmountIn(self, zeroForOne, out);
         }
 
+        // turn the amount back to the original token decimals for user returns and accountings
+        {
+            amountIn = toNative(zeroForOne ? sortResult.token0 : sortResult.token1, amountIn);
+            out = toNative(zeroForOne ? sortResult.token1 : sortResult.token0, out);
+        }
+
         bytes memory swapData;
         IPoolManager.SwapParams memory ammSwapParams;
         ammSwapParams = IPoolManager.SwapParams(zeroForOne, int256(out), Constants.SQRT_PRICE_1_1);
@@ -387,14 +393,17 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         uint256 amountIn;
         uint256 amountOut;
 
+        (Currency input, Currency output) = _getInputOutput(self, params.zeroForOne);
+
         // we calculate how much they must pay
         if (exactIn) {
             amountIn = uint256(-params.amountSpecified);
+            amountIn = normalize(input, amountIn);
             amountOut = _getAmountOut(self, params.zeroForOne, amountIn);
         } else {
             amountOut = uint256(params.amountSpecified);
+            amountOut = normalize(output, amountOut);
             amountIn = _getAmountIn(self, params.zeroForOne, amountOut);
-            (params.zeroForOne, amountOut);
         }
 
         // if exact in, the hook must goes into "debt" equal to amount out
@@ -405,9 +414,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         //
         // EXACT OUT :
         // unspecificiedDelta : specifiedDelta =  how much output token the user wants : how much input token user must pay
-        unspecificiedAmount = exactIn ? -int256(amountOut) : int256(amountIn);
-
-        (Currency input, Currency output) = _getInputOutput(self, params.zeroForOne);
+        unspecificiedAmount = exactIn ? -int256(toNative(output, amountOut)) : int256(toNative(input, amountIn));
 
         self.ensureLiquidityEnough(amountOut, Currency.unwrap(output));
 
@@ -449,8 +456,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             emit ICorkHook.Swapped(
                 Currency.unwrap(input),
                 Currency.unwrap(output),
-                amountIn,
-                amountOut,
+                toNative(input, amountIn),
+                toNative(output, amountOut),
                 actualSender,
                 baseFeePercentage,
                 actualFeePercentage
@@ -507,6 +514,9 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             // so we use amountIn as the payment amount cause they they have to pay with the other token
             (uint256 paymentAmount, address paymentToken) = (amountIn, Currency.unwrap(input));
 
+            // we convert the payment amount to the native decimals, fso that integrator contract can use it directly
+            paymentAmount = toNative(paymentToken, paymentAmount);
+
             // call the callback
             CorkSwapCallback(sender).CorkCall(sender, hookData, paymentAmount, paymentToken, address(poolManager));
         }
@@ -530,7 +540,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         // unspecificiedDelta : specifiedDelta =  how much output token the user wants : how much input token user must pay
         //
         // since in this case, exact in swap doesn't really make sense, we just return the amount in
-        unspecificiedAmount = int256(amountIn);
+        unspecificiedAmount = int256(toNative(input, amountIn));
     }
 
     function _getAmountIn(PoolState storage self, bool zeroForOne, uint256 amountOut)
