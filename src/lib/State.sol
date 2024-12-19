@@ -130,6 +130,16 @@ library PoolStateLibrary {
     /// to prevent price manipulation at the start of the pool
     uint256 internal constant MINIMUM_LIQUIDITY = 1e4;
 
+    function ensureLiquidityEnough(PoolState storage state, uint256 amountOut, address token) internal view {
+        if (token == state.token0 && state.reserve0 < amountOut) {
+            revert IErrors.NotEnoughLiquidity();
+        } else if (token == state.token1 && state.reserve1 < amountOut) {
+            revert IErrors.NotEnoughLiquidity();
+        } else {
+            return;
+        }
+    }
+
     function updateReserves(PoolState storage state, address token, uint256 amount, bool minus) internal {
         if (token == state.token0) {
             state.reserve0 = minus ? state.reserve0 - amount : state.reserve0 + amount;
