@@ -277,16 +277,6 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         emit ICorkHook.AddedLiquidity(ra, ct, amountRa, amountCt, mintedLp, msg.sender);
     }
 
-    function _refundExcess(address ra, address ct, uint256 amountRa, uint256 amountCt) internal {
-        if (amountRa > 0) {
-            IERC20(ra).transfer(msg.sender, amountRa);
-        }
-
-        if (amountCt > 0) {
-            IERC20(ct).transfer(msg.sender, amountCt);
-        }
-    }
-
     function removeLiquidity(
         address ra,
         address ct,
@@ -665,14 +655,6 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
     function _getIssuedAndMaturationTime(PoolState storage self) internal view returns (uint256 start, uint256 end) {
         return (self.startTimestamp, self.endTimestamp);
-    }
-
-    function _k(PoolState storage self) internal view returns (uint256 invariant, uint256 oneMinusT) {
-        (uint256 reserve0, uint256 reserve1) = (self.reserve0, self.reserve1);
-        (uint256 start, uint256 end) = _getIssuedAndMaturationTime(self);
-
-        invariant = SwapMath.getInvariant(reserve0, reserve1, start, end, block.timestamp);
-        oneMinusT = _1MinT(self);
     }
 
     function _1MinT(PoolState storage self) internal view returns (uint256) {
