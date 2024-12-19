@@ -4,6 +4,10 @@ import {LiquidityMath} from "./LiquidityMath.sol";
 import {LiquidityToken} from "./../LiquidityToken.sol";
 import {Currency} from "v4-periphery/lib/v4-core/src/types/Currency.sol";
 import {IErrors} from "./../interfaces/IErrors.sol";
+import {Currency} from "v4-periphery/lib/v4-core/src/types/Currency.sol";
+import {CurrencySettler} from "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
+import {IPoolManager} from "v4-periphery/lib/v4-core/src/interfaces/IPoolManager.sol";
+import {TransferHelper} from "Depeg-swap/contracts/libraries/TransferHelper.sol";
 
 /// @notice amm id,
 type AmmId is bytes32;
@@ -63,6 +67,50 @@ function sortPacked(address a, address b) pure returns (SortResult memory) {
     return SortResult(token0, token1, 0, 0);
 }
 
+/// @notice settle tokens from the pool manager, all numbers are fixed point 18 decimals on the hook
+/// so this function is expected to be used on every "settle" action
+function settleNormalized(Currency currency, IPoolManager manager, address payer, uint256 amount, bool burn) {
+    amount = TransferHelper.fixedToTokenNativeDecimals(amount, Currency.unwrap(currency));
+    CurrencySettler.settle(currency, manager, payer, amount, burn);
+}
+
+/// @notice take tokens from the pool manager, all numbers are fixed point 18 decimals on the hook
+/// so this function is expected to be used on every "take" action
+function takeNormalized(Currency currency, IPoolManager manager, address recipient, uint256 amount, bool claims) {
+    amount = TransferHelper.fixedToTokenNativeDecimals(amount, Currency.unwrap(currency));
+    CurrencySettler.take(currency, manager, recipient, amount, claims);
+}
+
+function normalize(SortResult memory result) view returns (SortResult memory) {
+    return SortResult(
+        result.token0,
+        result.token1,
+        TransferHelper.tokenNativeDecimalsToFixed(result.amount0, result.token0),
+        TransferHelper.tokenNativeDecimalsToFixed(result.amount1, result.token1)
+    );
+}
+
+function normalize(address token, uint256 amount) view returns (uint256) {
+    return TransferHelper.tokenNativeDecimalsToFixed(amount, token);
+}
+
+function normalize(Currency _token, uint256 amount) view returns (uint256) {
+    address token = Currency.unwrap(_token);
+    return TransferHelper.tokenNativeDecimalsToFixed(amount, token);
+}
+
+function toNative(Currency _token, uint256 amount) view returns (uint256) {
+    address token = Currency.unwrap(_token);
+    return TransferHelper.fixedToTokenNativeDecimals(amount, token);
+}
+
+function toNative(address token, uint256 amount) view returns (uint256) {
+    return TransferHelper.fixedToTokenNativeDecimals(amount, token);
+}
+
+/// @notice Pool state
+/// all reserve are stored in 18 decimals format regardless of the token decimals
+/// all conversion happen internally, and user must use amount in their token respective decimals
 struct PoolState {
     uint256 reserve0;
     uint256 reserve1;
@@ -77,10 +125,10 @@ struct PoolState {
 }
 
 library PoolStateLibrary {
-    uint256 constant internal MAX_FEE = 100e18;
+    uint256 internal constant MAX_FEE = 100e18;
 
     /// to prevent price manipulation at the start of the pool
-    uint256 constant internal MINIMUM_LIQUIDITY = 1e4;
+    uint256 internal constant MINIMUM_LIQUIDITY = 1e4;
 
     function ensureLiquidityEnough(PoolState storage state, uint256 amountOut, address token) internal view {
         if (token == state.token0 && state.reserve0 < amountOut) {

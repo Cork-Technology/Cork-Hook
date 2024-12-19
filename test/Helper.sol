@@ -13,6 +13,26 @@ import {CorkHook, LiquidityToken, AmmId, PoolState} from "./../src/CorkHook.sol"
 import {TestCorkHook} from "./TestCorkHook.sol";
 import "Depeg-swap/contracts/core/assets/Asset.sol";
 
+contract CustomAsset is Asset {
+    uint8 _decimals;
+
+    constructor(
+        string memory prefix,
+        string memory _pairName,
+        address _owner,
+        uint256 _expiry,
+        uint256 _rate,
+        uint256 _dsId,
+        uint8 decimals_
+    ) Asset(prefix, _pairName, _owner, _expiry, _rate, _dsId) {
+        _decimals = decimals_;
+    }
+
+    function decimals() public view override returns (uint8) {
+        return _decimals;
+    }
+}
+
 contract TestHelper is Test, Deployers {
     IPoolManager poolManager;
 
@@ -28,6 +48,7 @@ contract TestHelper is Test, Deployers {
     );
 
     address DEFAULT_ADDRESS = address(69);
+    uint8 DEFAULT_DECIMALS = 18;
 
     function expiry() internal pure virtual returns (uint256) {
         return 0;
@@ -38,8 +59,28 @@ contract TestHelper is Test, Deployers {
 
         poolManager = IPoolManager(manager);
 
-        token0 = new Asset("AA", "ABAB", address(this), expiry(), 0);
-        token1 = new Asset("AA", "ABAB", address(this), expiry(), 0);
+        token0 = new Asset("AA", "ABAB", address(this), expiry(), 0, 1);
+        token1 = new Asset("AA", "ABAB", address(this), expiry(), 0, 1);
+
+        //sort
+        if (address(token0) > address(token1)) {
+            (token0, token1) = (token1, token0);
+        }
+
+        lpBase = new LiquidityToken();
+
+        deployCodeTo("TestCorkHook.sol", abi.encode(poolManager, lpBase), address(flags));
+
+        hook = TestCorkHook(address(flags));
+    }
+
+    function setupTestWithDifferentDecimals(uint8 decimals0, uint8 decimals1) public {
+        deployFreshManagerAndRouters();
+
+        poolManager = IPoolManager(manager);
+
+        token0 = Asset(new CustomAsset("AA", "ABAB", address(this), expiry(), 0, 1, decimals0));
+        token1 = Asset(new CustomAsset("AA", "ABAB", address(this), expiry(), 0, 1, decimals1));
 
         //sort
         if (address(token0) > address(token1)) {

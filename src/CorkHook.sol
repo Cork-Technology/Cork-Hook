@@ -27,9 +27,6 @@ import "./lib/State.sol";
 import "./lib/Calls.sol";
 import "v4-periphery/lib/v4-core/src/types/BeforeSwapDelta.sol";
 
-// TODO : make documentation on how to properly initialize the pool
-// TODO : create events
-// TODO : make it upgradeable
 contract CorkHook is BaseHook, Ownable, ICorkHook {
     using Clones for address;
     using PoolStateLibrary for PoolState;
@@ -40,8 +37,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     mapping(AmmId => PoolState) internal pool;
 
     // we will deploy proxy to this address for each pool
-    address immutable internal lpBase;
-    HookForwarder immutable internal forwarder;
+    address internal immutable lpBase;
+    HookForwarder internal immutable forwarder;
 
     constructor(IPoolManager _poolManager, LiquidityToken _lpBase, address owner)
         BaseHook(_poolManager)
@@ -144,6 +141,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         returns (uint256 amountIn)
     {
         SortResult memory sortResult = sortPacked(ra, ct, amountRaOut, amountCtOut);
+        sortResult = normalize(sortResult);
+
         _ensureValidAmount(sortResult.amount0, sortResult.amount1);
 
         // if the amount1 is zero, then we swap token0 to token1, and vice versa
@@ -154,7 +153,12 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             PoolState storage self = pool[toAmmId(sortResult.token0, sortResult.token1)];
             amountIn = _getAmountIn(self, zeroForOne, out);
         }
-        // all sanitiy check should go here
+
+        // turn the amount back to the original token decimals for user returns and accountings
+        {
+            amountIn = toNative(zeroForOne ? sortResult.token0 : sortResult.token1, amountIn);
+            out = toNative(zeroForOne ? sortResult.token1 : sortResult.token0, out);
+        }
 
         bytes memory swapData;
         IPoolManager.SwapParams memory ammSwapParams;
@@ -196,12 +200,12 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         Currency token1 = self.getToken1();
 
         // settle claims token
-        token0.settle(poolManager, sender, amount0, false);
-        token1.settle(poolManager, sender, amount1, false);
+        settleNormalized(token0, poolManager, sender, amount0, false);
+        settleNormalized(token1, poolManager, sender, amount1, false);
 
         // take the tokens
-        token0.take(poolManager, address(this), amount0, true);
-        token1.take(poolManager, address(this), amount1, true);
+        takeNormalized(token0, poolManager, address(this), amount0, true);
+        takeNormalized(token1, poolManager, address(this), amount1, true);
     }
 
     function _removeLiquidity(PoolState storage self, uint256 liquidityAmount, address sender) internal {
@@ -211,12 +215,12 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         Currency token1 = self.getToken1();
 
         // burn claims token
-        token0.settle(poolManager, address(this), amount0, true);
-        token1.settle(poolManager, address(this), amount1, true);
+        settleNormalized(token0, poolManager, address(this), amount0, true);
+        settleNormalized(token1, poolManager, address(this), amount1, true);
 
         // send back the tokens
-        token0.take(poolManager, sender, amount0, false);
-        token1.take(poolManager, sender, amount1, false);
+        takeNormalized(token0, poolManager, sender, amount0, false);
+        takeNormalized(token1, poolManager, sender, amount1, false);
     }
 
     // we dont check for initialization here since we want to pre init the fee
@@ -235,6 +239,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     ) external withinDeadline(deadline) returns (uint256 amountRa, uint256 amountCt, uint256 mintedLp) {
         // returns how much liquidity token was minted
         SortResult memory sortResult = sortPacked(ra, ct, raAmount, ctAmount);
+        sortResult = normalize(sortResult);
 
         PoolState storage self = pool[toAmmId(sortResult.token0, sortResult.token1)];
 
@@ -259,6 +264,10 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
             // now we actually sort back the tokens
             (amountRa, amountCt) = ra == sortResult.token0 ? (amountRa, amountCt) : (amountCt, amountRa);
+
+            // we convert the amount to the native decimals to reflect the actual amount when returning
+            amountRa = toNative(ra, amountRa);
+            amountCt = toNative(ct, amountCt);
 
             bytes memory data = abi.encode(Action.AddLiquidity, params);
 
@@ -287,6 +296,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         uint256 deadline
     ) external withinDeadline(deadline) returns (uint256 amountRa, uint256 amountCt) {
         SortResult memory sortResult = sortPacked(ra, ct);
+        sortResult = normalize(sortResult);
 
         AmmId ammId = toAmmId(sortResult.token0, sortResult.token1);
         PoolState storage self = pool[ammId];
@@ -299,6 +309,9 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         (uint256 amount0, uint256 amount1,,) = self.tryRemoveLiquidity(liquidityAmount);
         (,, amountRa, amountCt) = reverseSortWithAmount(ra, ct, sortResult.token0, sortResult.token1, amount0, amount1);
 
+        amountRa = toNative(ra, amountRa);
+        amountCt = toNative(ct, amountCt);
+        
         if (amountRa < amountRamin || amountCt < amountCtmin) {
             revert IErrors.InsufficientOutputAmout();
         }
@@ -387,14 +400,17 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         uint256 amountIn;
         uint256 amountOut;
 
+        (Currency input, Currency output) = _getInputOutput(self, params.zeroForOne);
+
         // we calculate how much they must pay
         if (exactIn) {
             amountIn = uint256(-params.amountSpecified);
+            amountIn = normalize(input, amountIn);
             amountOut = _getAmountOut(self, params.zeroForOne, amountIn);
         } else {
             amountOut = uint256(params.amountSpecified);
+            amountOut = normalize(output, amountOut);
             amountIn = _getAmountIn(self, params.zeroForOne, amountOut);
-            (params.zeroForOne, amountOut);
         }
 
         // if exact in, the hook must goes into "debt" equal to amount out
@@ -405,9 +421,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         //
         // EXACT OUT :
         // unspecificiedDelta : specifiedDelta =  how much output token the user wants : how much input token user must pay
-        unspecificiedAmount = exactIn ? -int256(amountOut) : int256(amountIn);
-
-        (Currency input, Currency output) = _getInputOutput(self, params.zeroForOne);
+        unspecificiedAmount = exactIn ? -int256(toNative(output, amountOut)) : int256(toNative(input, amountIn));
 
         self.ensureLiquidityEnough(amountOut, Currency.unwrap(output));
 
@@ -415,7 +429,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         self.updateReserves(Currency.unwrap(output), amountOut, true);
 
         // we transfer their tokens, i.e we settle the output token first so that the user can take the input token
-        output.settle(poolManager, address(this), amountOut, true);
+        settleNormalized(output, poolManager, address(this), amountOut, true);
 
         // there is data, means flash swap
         if (hookData.length > 0) {
@@ -427,7 +441,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             self.updateReserves(Currency.unwrap(input), amountIn, false);
 
             // settle swap, i.e we take the input token from the pool manager, the debt will be payed by the user
-            input.take(poolManager, address(this), amountIn, true);
+            takeNormalized(input, poolManager, address(this), amountIn, true);
 
             // forward token to user if caller is forwarder
             if (sender == address(forwarder)) {
@@ -449,8 +463,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             emit ICorkHook.Swapped(
                 Currency.unwrap(input),
                 Currency.unwrap(output),
-                amountIn,
-                amountOut,
+                toNative(input, amountIn),
+                toNative(output, amountOut),
                 actualSender,
                 baseFeePercentage,
                 actualFeePercentage
@@ -500,12 +514,15 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
             try forwarder.forwardTokenUncheked(output, amountOut) {}
             // if failed then the user directly calls pool manager to flash swap, in that case we must send their token directly here
             catch {
-                poolManager.take(output, sender, amountOut);
+                takeNormalized(input, poolManager, sender, amountIn, false);
             }
 
             // we expect user to use exact output swap when dealing with flash swap
             // so we use amountIn as the payment amount cause they they have to pay with the other token
             (uint256 paymentAmount, address paymentToken) = (amountIn, Currency.unwrap(input));
+
+            // we convert the payment amount to the native decimals, fso that integrator contract can use it directly
+            paymentAmount = toNative(paymentToken, paymentAmount);
 
             // call the callback
             CorkSwapCallback(sender).CorkCall(sender, hookData, paymentAmount, paymentToken, address(poolManager));
@@ -517,7 +534,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         self.updateReserves(Currency.unwrap(input), amountIn, false);
 
         // settle swap, i.e we take the input token from the pool manager, the debt will be payed by the user, at this point, the user should've created a debit on the PM
-        input.take(poolManager, address(this), amountIn, true);
+        takeNormalized(input, poolManager, address(this), amountIn, true);
 
         // this is similar to normal swap, the unspecified amount is the other tokens
         // if exact in, the hook must goes into "debt" equal to amount out
@@ -530,7 +547,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         // unspecificiedDelta : specifiedDelta =  how much output token the user wants : how much input token user must pay
         //
         // since in this case, exact in swap doesn't really make sense, we just return the amount in
-        unspecificiedAmount = int256(amountIn);
+        unspecificiedAmount = int256(toNative(input, amountIn));
     }
 
     function _getAmountIn(PoolState storage self, bool zeroForOne, uint256 amountOut)
@@ -550,7 +567,6 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         }
 
         uint256 oneMinusT = _1MinT(self);
-        // TODO : workaround for now, if not for this then the k will decrease slightly than we expected(only work for 1000 :1050 reserve with 1 swao amount at time of 1-t = 0.1)
         amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, oneMinusT, self.fee);
     }
 
@@ -566,7 +582,15 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
         PoolState storage self = pool[toAmmId(token0, token1)];
 
+        address inToken = zeroForOne ? token0 : token1;
+        address outToken = zeroForOne ? token1 : token0;
+
+        // since the reserve is encoded in 18 decimals, we need to normalize the amount out
+        amountOut = normalize(outToken, amountOut);
         amountIn = _getAmountIn(self, zeroForOne, amountOut);
+
+        // convert to the proper decimals
+        amountIn = TransferHelper.fixedToTokenNativeDecimals(amountIn, inToken);
     }
 
     function _getAmountOut(PoolState storage self, bool zeroForOne, uint256 amountIn)
@@ -599,9 +623,16 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         // infer zero to one
         bool zeroForOne = raForCt ? (token0 == ra) : (token0 == ct);
 
+        address inToken = zeroForOne ? token0 : token1;
+        address outToken = zeroForOne ? token1 : token0;
+
         PoolState storage self = pool[toAmmId(token0, token1)];
 
+        // since the reserve is encoded in 18 decimals, we need to normalize the amount out
+        amountIn = normalize(inToken, amountIn);
         amountOut = _getAmountOut(self, zeroForOne, amountIn);
+
+        amountOut = normalize(outToken, amountOut);
     }
 
     function _getInputOutput(PoolState storage self, bool zeroForOne)
@@ -664,13 +695,19 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         return address(forwarder);
     }
 
-    function getMarketSnapshot(address ra, address ct) external view returns (MarketSnapshot memory) {
+    function getMarketSnapshot(address ra, address ct) external view returns (MarketSnapshot memory snapshot) {
         PoolState storage self = pool[toAmmId(ra, ct)];
 
         // sort reserve according user input
         uint256 raReserve = self.token0 == ra ? self.reserve0 : self.reserve1;
         uint256 ctReserve = self.token0 == ct ? self.reserve0 : self.reserve1;
 
-        return MarketSnapshot(raReserve, ctReserve, _1MinT(self), self.fee, address(self.liquidityToken));
+        snapshot.baseFee = self.fee;
+        snapshot.liquidityToken = address(self.liquidityToken);
+        snapshot.oneMinusT = _1MinT(self);
+        snapshot.ra = ra;
+        snapshot.ct = ct;
+        snapshot.reserveRa = raReserve;
+        snapshot.reserveCt = ctReserve;
     }
 }

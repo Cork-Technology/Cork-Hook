@@ -1,8 +1,11 @@
 pragma solidity ^0.8.20;
 
 import {SwapMath} from "./SwapMath.sol";
+import "Depeg-swap/contracts/libraries/TransferHelper.sol";
 
 struct MarketSnapshot {
+    address ra;
+    address ct;
     uint256 reserveRa;
     uint256 reserveCt;
     uint256 oneMinusT;
@@ -13,25 +16,38 @@ struct MarketSnapshot {
 library MarketSnapshotLib {
     function getAmountOut(MarketSnapshot memory self, uint256 amountIn, bool raForCt)
         internal
-        pure
+        view
         returns (uint256 amountOut)
     {
+        address tokenIn = raForCt ? self.ra : self.ct;
+
+        amountIn = TransferHelper.tokenNativeDecimalsToFixed(amountIn, tokenIn);
+
         if (raForCt) {
-            return SwapMath.getAmountOut(amountIn, self.reserveRa, self.reserveCt, self.oneMinusT, self.baseFee);
+            amountOut = SwapMath.getAmountOut(amountIn, self.reserveRa, self.reserveCt, self.oneMinusT, self.baseFee);
         } else {
-            return SwapMath.getAmountOut(amountIn, self.reserveCt, self.reserveRa, self.oneMinusT, self.baseFee);
+            amountOut = SwapMath.getAmountOut(amountIn, self.reserveCt, self.reserveRa, self.oneMinusT, self.baseFee);
         }
+
+        address tokenOut = raForCt ? self.ct : self.ra;
+        amountOut = TransferHelper.fixedToTokenNativeDecimals(amountOut, self.ct);
     }
 
     function getAmountIn(MarketSnapshot memory self, uint256 amountOut, bool raForCt)
         internal
-        pure
+        view
         returns (uint256 amountIn)
     {
+        address tokenOut = raForCt ? self.ct : self.ra;
+        amountOut = TransferHelper.tokenNativeDecimalsToFixed(amountOut, tokenOut);
+
         if (raForCt) {
-            return SwapMath.getAmountIn(amountOut, self.reserveRa, self.reserveCt, self.oneMinusT, self.baseFee);
+            amountIn = SwapMath.getAmountIn(amountOut, self.reserveRa, self.reserveCt, self.oneMinusT, self.baseFee);
         } else {
-            return SwapMath.getAmountIn(amountOut, self.reserveCt, self.reserveRa, self.oneMinusT, self.baseFee);
+            amountIn = SwapMath.getAmountIn(amountOut, self.reserveCt, self.reserveRa, self.oneMinusT, self.baseFee);
         }
+
+        address tokenIn = raForCt ? self.ra : self.ct;
+        amountIn = TransferHelper.fixedToTokenNativeDecimals(amountIn, tokenIn);
     }
 }

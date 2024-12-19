@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {ud, add, mul, sub, div, unwrap, sqrt} from "@prb/math/src/UD60x18.sol";
 import {IErrors} from "./../interfaces/IErrors.sol";
+import "Depeg-swap/contracts/libraries/TransferHelper.sol";
 
 library LiquidityMath {
     // Adding Liquidity (Pure Function)
