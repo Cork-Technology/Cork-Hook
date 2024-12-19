@@ -1,7 +1,7 @@
 pragma solidity ^0.8.20;
 
 import {SwapMath} from "./SwapMath.sol";
-import "Depeg-swap/contracts/libraries/TransferHelper.sol";
+import {TransferHelper} from "Depeg-swap/contracts/libraries/TransferHelper.sol";
 
 struct MarketSnapshot {
     address ra;
