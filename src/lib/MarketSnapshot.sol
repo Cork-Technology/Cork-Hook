@@ -23,14 +23,34 @@ library MarketSnapshotLib {
 
         amountIn = TransferHelper.tokenNativeDecimalsToFixed(amountIn, tokenIn);
 
+        amountOut = getAmountOutNoConvert(self, amountIn, raForCt);
+
+        address tokenOut = raForCt ? self.ct : self.ra;
+        amountOut = TransferHelper.fixedToTokenNativeDecimals(amountOut, self.ct);
+    }
+
+    function getAmountOutNoConvert(MarketSnapshot memory self, uint256 amountIn, bool raForCt)
+        internal
+        view
+        returns (uint256 amountOut)
+    {
         if (raForCt) {
             amountOut = SwapMath.getAmountOut(amountIn, self.reserveRa, self.reserveCt, self.oneMinusT, self.baseFee);
         } else {
             amountOut = SwapMath.getAmountOut(amountIn, self.reserveCt, self.reserveRa, self.oneMinusT, self.baseFee);
         }
+    }
 
-        address tokenOut = raForCt ? self.ct : self.ra;
-        amountOut = TransferHelper.fixedToTokenNativeDecimals(amountOut, self.ct);
+    function getAmountInNoConvert(MarketSnapshot memory self, uint256 amountOut, bool raForCt)
+        internal
+        view
+        returns (uint256 amountIn)
+    {
+        if (raForCt) {
+            amountIn = SwapMath.getAmountIn(amountOut, self.reserveRa, self.reserveCt, self.oneMinusT, self.baseFee);
+        } else {
+            amountIn = SwapMath.getAmountIn(amountOut, self.reserveCt, self.reserveRa, self.oneMinusT, self.baseFee);
+        }
     }
 
     function getAmountIn(MarketSnapshot memory self, uint256 amountOut, bool raForCt)
@@ -41,11 +61,7 @@ library MarketSnapshotLib {
         address tokenOut = raForCt ? self.ct : self.ra;
         amountOut = TransferHelper.tokenNativeDecimalsToFixed(amountOut, tokenOut);
 
-        if (raForCt) {
-            amountIn = SwapMath.getAmountIn(amountOut, self.reserveRa, self.reserveCt, self.oneMinusT, self.baseFee);
-        } else {
-            amountIn = SwapMath.getAmountIn(amountOut, self.reserveCt, self.reserveRa, self.oneMinusT, self.baseFee);
-        }
+        amountOut = getAmountInNoConvert(self, amountOut, raForCt);
 
         address tokenIn = raForCt ? self.ra : self.ct;
         amountIn = TransferHelper.fixedToTokenNativeDecimals(amountIn, tokenIn);
