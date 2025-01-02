@@ -74,10 +74,18 @@ function settleNormalized(Currency currency, IPoolManager manager, address payer
     CurrencySettler.settle(currency, manager, payer, amount, burn);
 }
 
+function settle(Currency currency, IPoolManager manager, address payer, uint256 amount, bool burn) {
+    CurrencySettler.settle(currency, manager, payer, amount, burn);
+}
+
 /// @notice take tokens from the pool manager, all numbers are fixed point 18 decimals on the hook
 /// so this function is expected to be used on every "take" action
 function takeNormalized(Currency currency, IPoolManager manager, address recipient, uint256 amount, bool claims) {
     amount = TransferHelper.fixedToTokenNativeDecimals(amount, Currency.unwrap(currency));
+    CurrencySettler.take(currency, manager, recipient, amount, claims);
+}
+
+function take(Currency currency, IPoolManager manager, address recipient, uint256 amount, bool claims) {
     CurrencySettler.take(currency, manager, recipient, amount, claims);
 }
 
@@ -109,10 +117,10 @@ function toNative(address token, uint256 amount) view returns (uint256) {
 }
 
 /// @notice Pool state
-/// all reserve are stored in 18 decimals format regardless of the token decimals
-/// all conversion happen internally, and user must use amount in their token respective decimals
 struct PoolState {
+    /// @notice reserve of token0, in the native decimals
     uint256 reserve0;
+    /// @notice reserve of token1, in the native decimals
     uint256 reserve1;
     address token0;
     address token1;
@@ -130,7 +138,9 @@ library PoolStateLibrary {
     /// to prevent price manipulation at the start of the pool
     uint256 internal constant MINIMUM_LIQUIDITY = 1e4;
 
-    function ensureLiquidityEnough(PoolState storage state, uint256 amountOut, address token) internal view {
+    function ensureLiquidityEnoughAsNative(PoolState storage state, uint256 amountOut, address token) internal view {
+        amountOut = TransferHelper.fixedToTokenNativeDecimals(amountOut, token);
+
         if (token == state.token0 && state.reserve0 < amountOut) {
             revert IErrors.NotEnoughLiquidity();
         } else if (token == state.token1 && state.reserve1 < amountOut) {
@@ -148,6 +158,11 @@ library PoolStateLibrary {
         } else {
             revert IErrors.InvalidToken();
         }
+    }
+
+    function updateReservesAsNative(PoolState storage state, address token, uint256 amount, bool minus) internal {
+        amount = TransferHelper.fixedToTokenNativeDecimals(amount, token);
+        updateReserves(state, token, amount, minus);
     }
 
     function updateFee(PoolState storage state, uint256 fee) internal {
@@ -186,12 +201,17 @@ library PoolStateLibrary {
         internal
         returns (uint256 reserve0, uint256 reserve1, uint256 mintedLp, uint256 amount0Used, uint256 amount1Used)
     {
-        (amount0Used, amount1Used) =
-            LiquidityMath.inferOptimalAmount(state.reserve0, state.reserve1, amount0, amount1, amount0min, amount1min);
+        reserve0 = TransferHelper.tokenNativeDecimalsToFixed(state.reserve0, state.token0);
+        reserve1 = TransferHelper.tokenNativeDecimalsToFixed(state.reserve1, state.token1);
 
-        (reserve0, reserve1, mintedLp) = LiquidityMath.addLiquidity(
-            state.reserve0, state.reserve1, state.liquidityToken.totalSupply(), amount0, amount1
-        );
+        (amount0Used, amount1Used) =
+            LiquidityMath.inferOptimalAmount(reserve0, reserve1, amount0, amount1, amount0min, amount1min);
+
+        (reserve0, reserve1, mintedLp) =
+            LiquidityMath.addLiquidity(reserve0, reserve1, state.liquidityToken.totalSupply(), amount0, amount1);
+
+        reserve0 = TransferHelper.fixedToTokenNativeDecimals(reserve0, state.token0);
+        reserve1 = TransferHelper.fixedToTokenNativeDecimals(reserve1, state.token1);
 
         // we lock minimum liquidity to prevent price manipulation at the start of the pool
         if (state.reserve0 == 0 && state.reserve1 == 0) {

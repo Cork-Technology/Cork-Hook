@@ -62,9 +62,8 @@ contract AddLiquidityTest is TestHelper {
         hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0, block.timestamp);
         PoolState memory state = hook.getPoolState(address(token0), address(token1));
 
-        // we store the normalized amount in the pool
-        vm.assertEq(state.reserve0, 1000 ether);
-        vm.assertEq(state.reserve1, 900 ether);
+        vm.assertEq(state.reserve0, amount0);
+        vm.assertEq(state.reserve1, amount1);
 
         vm.assertApproxEqAbs(state.liquidityToken.totalSupply(), 948.6832 ether, 0.0001 ether);
     }
