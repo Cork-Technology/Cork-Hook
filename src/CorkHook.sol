@@ -152,7 +152,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
         {
             PoolState storage self = pool[toAmmId(sortResult.token0, sortResult.token1)];
-            amountIn = _getAmountIn(self, zeroForOne, out);
+            (amountIn,) = _getAmountIn(self, zeroForOne, out);
         }
 
         // turn the amount back to the original token decimals for user returns and accountings
@@ -227,6 +227,10 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     // we dont check for initialization here since we want to pre init the fee
     function updateBaseFeePercentage(address ra, address ct, uint256 baseFeePercentage) external onlyOwner {
         pool[toAmmId(ra, ct)].fee = baseFeePercentage;
+    }
+
+    function updateTreasurySplitPercentage(address ra, address ct, uint256 treasurySplit) external onlyOwner {
+        pool[toAmmId(ra, ct)].treasurySplitPercentage = treasurySplit;
     }
 
     function addLiquidity(
@@ -387,6 +391,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         bool exactIn = (params.amountSpecified < 0);
         uint256 amountIn;
         uint256 amountOut;
+        // the fee here will always refer to the input token
+        uint256 fee;
 
         (Currency input, Currency output) = _getInputOutput(self, params.zeroForOne);
 
@@ -394,11 +400,11 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         if (exactIn) {
             amountIn = uint256(-params.amountSpecified);
             amountIn = normalize(input, amountIn);
-            amountOut = _getAmountOut(self, params.zeroForOne, amountIn);
+            (amountOut, fee) = _getAmountOut(self, params.zeroForOne, amountIn);
         } else {
             amountOut = uint256(params.amountSpecified);
             amountOut = normalize(output, amountOut);
-            amountIn = _getAmountIn(self, params.zeroForOne, amountOut);
+            (amountIn, fee) = _getAmountIn(self, params.zeroForOne, amountOut);
         }
 
         // if exact in, the hook must goes into "debt" equal to amount out
@@ -440,6 +446,9 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         // IMPORTANT: we won't compare K right now since the K amount will never be the same and have slight imprecision.
         // but this is fine since the hook knows how much tokens it should receive and give based on the balance delta which it calculate from the invariants
 
+        // split fee from input token
+        _splitFee(self, fee, input);
+
         {
             // the true caller, we try to infer this by checking if the sender is the forwarder, we can get the true caller from
             // the forwarder transient slot
@@ -458,6 +467,24 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
                 actualFeePercentage
             );
         }
+    }
+
+    function _splitFee(PoolState storage self, uint256 fee, Currency _token) internal {
+        address token = Currency.unwrap(_token);
+        
+        // take and settle fee token from manager
+        settleNormalized(_token, poolManager, address(this), fee, true);
+        takeNormalized(_token, poolManager, address(this), fee, false);
+
+        // split fee
+        uint256 treasuryAttributed = SwapMath.calculatePercentage(fee, self.treasurySplitPercentage);
+        self.updateReservesAsNative(token, treasuryAttributed, true);
+
+        // send fee to treasury
+        ITreasury config = ITreasury(owner());
+        address treasury = config.treasury();
+
+        TransferHelper.transferNormalize(token, treasury, treasuryAttributed);
     }
 
     function getFee(address ra, address ct)
@@ -541,7 +568,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     function _getAmountIn(PoolState storage self, bool zeroForOne, uint256 amountOut)
         internal
         view
-        returns (uint256 amountIn)
+        returns (uint256 amountIn, uint256 fee)
     {
         if (amountOut <= 0) {
             revert IErrors.InvalidAmount();
@@ -560,7 +587,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         }
 
         uint256 oneMinusT = _1MinT(self);
-        (amountIn,) = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, oneMinusT, self.fee);
+        (amountIn, fee) = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, oneMinusT, self.fee);
     }
 
     function getAmountIn(address ra, address ct, bool raForCt, uint256 amountOut)
@@ -580,7 +607,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
         // we need to normalize the amount out, since we calculate everything in 18 decimals
         amountOut = normalize(outToken, amountOut);
-        amountIn = _getAmountIn(self, zeroForOne, amountOut);
+        (amountIn,) = _getAmountIn(self, zeroForOne, amountOut);
 
         // convert to the proper decimals
         amountIn = TransferHelper.fixedToTokenNativeDecimals(amountIn, inToken);
@@ -589,7 +616,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
     function _getAmountOut(PoolState storage self, bool zeroForOne, uint256 amountIn)
         internal
         view
-        returns (uint256 amountOut)
+        returns (uint256 amountOut, uint256 fee)
     {
         if (amountIn <= 0) {
             revert IErrors.InvalidAmount();
@@ -608,7 +635,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         }
 
         uint256 oneMinusT = _1MinT(self);
-        (amountOut,) = SwapMath.getAmountOut(amountIn, reserveIn, reserveOut, oneMinusT, self.fee);
+        (amountOut, fee) = SwapMath.getAmountOut(amountIn, reserveIn, reserveOut, oneMinusT, self.fee);
     }
 
     function getAmountOut(address ra, address ct, bool raForCt, uint256 amountIn)
@@ -628,7 +655,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
         // we need to normalize the amount out, since we calculate everything in 18 decimals
         amountIn = normalize(inToken, amountIn);
-        amountOut = _getAmountOut(self, zeroForOne, amountIn);
+        (amountOut,) = _getAmountOut(self, zeroForOne, amountIn);
 
         amountOut = normalize(outToken, amountOut);
     }
