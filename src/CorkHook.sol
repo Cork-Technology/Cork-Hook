@@ -554,13 +554,12 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         reserveIn = normalize(input, reserveIn);
         reserveOut = normalize(output, reserveOut);
 
-
         if (reserveIn <= 0 || reserveOut <= 0) {
             revert IErrors.NotEnoughLiquidity();
         }
 
         uint256 oneMinusT = _1MinT(self);
-        amountIn = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, oneMinusT, self.fee);
+        (amountIn,) = SwapMath.getAmountIn(amountOut, reserveIn, reserveOut, oneMinusT, self.fee);
     }
 
     function getAmountIn(address ra, address ct, bool raForCt, uint256 amountOut)
@@ -608,7 +607,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         }
 
         uint256 oneMinusT = _1MinT(self);
-        amountOut = SwapMath.getAmountOut(amountIn, reserveIn, reserveOut, oneMinusT, self.fee);
+        (amountOut,) = SwapMath.getAmountOut(amountIn, reserveIn, reserveOut, oneMinusT, self.fee);
     }
 
     function getAmountOut(address ra, address ct, bool raForCt, uint256 amountIn)
