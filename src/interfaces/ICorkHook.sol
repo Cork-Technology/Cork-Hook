@@ -65,7 +65,9 @@ interface ICorkHook is IErrors {
         uint256 realizedFeePercentage
     );
 
-    event AddedLiquidity(address ra, address ct, uint256 raAmount, uint256 ctAmount, uint256 mintedLp, address who);
+    event AddedLiquidity(address indexed ra, address indexed ct, uint256 raAmount, uint256 ctAmount, uint256 mintedLp, address who);
 
-    event RemovedLiquidity(address ra, address ct, uint256 raAmount, uint256 ctAmount, address who);
+    event RemovedLiquidity(address indexed ra, address indexed ct, uint256 raAmount, uint256 ctAmount, address who);
+
+    event Initialized(address indexed ra, address indexed ct, address liquidityToken);
 }
