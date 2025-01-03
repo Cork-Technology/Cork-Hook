@@ -43,7 +43,7 @@ contract DeployLocalScript is Script, StdCheats {
     function run() public {
         vm.startBroadcast(pk);
 
-        poolManager = new PoolManager();
+        poolManager = new PoolManager(user);
         token0 = new Asset("TK", "0", user, expiry, rate, 1);
         token1 = new Asset("TK", "1", user, expiry, rate, 1);
 

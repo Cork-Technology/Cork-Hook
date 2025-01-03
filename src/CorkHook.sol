@@ -22,6 +22,7 @@ import {IErrors} from "./interfaces/IErrors.sol";
 import {ICorkHook} from "./interfaces/ICorkHook.sol";
 import {MarketSnapshot} from "./lib/MarketSnapshot.sol";
 import {IHooks} from "v4-periphery/lib/v4-core/src/interfaces/IHooks.sol";
+import {ITreasury} from "./interfaces/ITreasury.sol";
 
 import "./lib/State.sol";
 import "./lib/Calls.sol";
