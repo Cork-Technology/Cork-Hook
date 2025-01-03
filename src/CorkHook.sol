@@ -246,6 +246,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         // all sanitiy check should go here
         if (!self.isInitialized()) {
             forwarder.initializePool(sortResult.token0, sortResult.token1);
+            emit Initialized(ra, ct, address(self.liquidityToken));
         }
 
         {
