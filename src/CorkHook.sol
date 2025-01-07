@@ -726,5 +726,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         snapshot.ct = ct;
         snapshot.reserveRa = raReserve;
         snapshot.reserveCt = ctReserve;
+        snapshot.startTimestamp = self.startTimestamp;
+        snapshot.endTimestamp = self.endTimestamp;
+        snapshot.treasuryFeePercentage = self.treasurySplitPercentage;
     }
 }

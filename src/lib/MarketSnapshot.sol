@@ -11,6 +11,9 @@ struct MarketSnapshot {
     uint256 oneMinusT;
     uint256 baseFee;
     address liquidityToken;
+    uint256 startTimestamp;
+    uint256 endTimestamp;
+    uint256 treasuryFeePercentage;
 }
 
 library MarketSnapshotLib {
