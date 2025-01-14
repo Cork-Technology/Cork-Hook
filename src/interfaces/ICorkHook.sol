@@ -57,12 +57,13 @@ interface ICorkHook is IErrors {
 
     event Swapped(
         address indexed input,
-        address output,
+        address indexed output,
         uint256 amountIn,
         uint256 amountOut,
-        address who,
+        address indexed who,
         uint256 baseFeePercentage,
-        uint256 realizedFeePercentage
+        uint256 realizedFeePercentage,
+        uint256 realizedFeeAmount
     );
 
     event AddedLiquidity(address indexed ra, address indexed ct, uint256 raAmount, uint256 ctAmount, uint256 mintedLp, address who);

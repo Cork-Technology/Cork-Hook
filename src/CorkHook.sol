@@ -464,7 +464,8 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
                 toNative(output, amountOut),
                 actualSender,
                 baseFeePercentage,
-                actualFeePercentage
+                actualFeePercentage,
+                fee
             );
         }
     }
