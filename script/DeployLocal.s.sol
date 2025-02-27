@@ -44,8 +44,8 @@ contract DeployLocalScript is Script, StdCheats {
         vm.startBroadcast(pk);
 
         poolManager = new PoolManager(user);
-        token0 = new Asset("TK", "0", user, expiry, rate, 1);
-        token1 = new Asset("TK", "1", user, expiry, rate, 1);
+        token0 = new Asset("TK", user, expiry, rate, 1);
+        token1 = new Asset("TK", user, expiry, rate, 1);
 
         token0.mint(user, type(uint256).max);
         token1.mint(user, type(uint256).max);

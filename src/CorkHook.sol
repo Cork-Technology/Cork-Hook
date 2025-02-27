@@ -472,7 +472,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
 
     function _splitFee(PoolState storage self, uint256 fee, Currency _token) internal {
         address token = Currency.unwrap(_token);
-        
+
         // split fee
         uint256 treasuryAttributed = SwapMath.calculatePercentage(fee, self.treasurySplitPercentage);
         self.updateReservesAsNative(token, treasuryAttributed, true);
@@ -480,7 +480,7 @@ contract CorkHook is BaseHook, Ownable, ICorkHook {
         // take and settle fee token from manager
         settleNormalized(_token, poolManager, address(this), treasuryAttributed, true);
         takeNormalized(_token, poolManager, address(this), treasuryAttributed, false);
-        
+
         // send fee to treasury
         ITreasury config = ITreasury(owner());
         address treasury = config.treasury();

@@ -6,7 +6,7 @@ library SenderSlot {
     /// address in the hook data is possible, we need to decode from it, and the data is meant
     /// to be exclusively used by the hook to store callback arguments data for flash swap
     /// @dev keccak256(sender)-1 . sender as utf-8
-    bytes32 constant internal SENDER_SLOT = 0x168E92CE035BA45E59A0314B0ED9A9E619B284AED8F6E5AB0A596EFD5C9F5CF8;
+    bytes32 internal constant SENDER_SLOT = 0x168E92CE035BA45E59A0314B0ED9A9E619B284AED8F6E5AB0A596EFD5C9F5CF8;
 
     function get() internal view returns (address) {
         address result;

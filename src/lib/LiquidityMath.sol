@@ -8,20 +8,10 @@ import {TransferHelper} from "Depeg-swap/contracts/libraries/TransferHelper.sol"
 library LiquidityMath {
     // Adding Liquidity (Pure Function)
     // caller of this contract must ensure the both amount is already proportional in amount!
-    function addLiquidity(
-        uint256 reserve0, 
-        uint256 reserve1, 
-        uint256 totalLiquidity, 
-        uint256 amount0, 
-        uint256 amount1 
-    )
+    function addLiquidity(uint256 reserve0, uint256 reserve1, uint256 totalLiquidity, uint256 amount0, uint256 amount1)
         internal
         pure
-        returns (
-            uint256 newReserve0, 
-            uint256 newReserve1, 
-            uint256 liquidityMinted 
-        )
+        returns (uint256 newReserve0, uint256 newReserve1, uint256 liquidityMinted)
     {
         // Calculate the liquidity tokens minted based on the added amounts and the current reserves
         if (totalLiquidity == 0) {
@@ -78,20 +68,10 @@ library LiquidityMath {
     }
 
     // Removing Liquidity (Pure Function)
-    function removeLiquidity(
-        uint256 reserve0, 
-        uint256 reserve1, 
-        uint256 totalLiquidity, 
-        uint256 liquidityAmount 
-    )
+    function removeLiquidity(uint256 reserve0, uint256 reserve1, uint256 totalLiquidity, uint256 liquidityAmount)
         internal
         pure
-        returns (
-            uint256 amount0, 
-            uint256 amount1, 
-            uint256 newReserve0, 
-            uint256 newReserve1 
-        )
+        returns (uint256 amount0, uint256 amount1, uint256 newReserve0, uint256 newReserve1)
     {
         if (liquidityAmount <= 0) {
             revert IErrors.InvalidAmount();

@@ -17,15 +17,9 @@ import "forge-std/console.sol";
 contract CustomAsset is Asset {
     uint8 _decimals;
 
-    constructor(
-        string memory prefix,
-        string memory _pairName,
-        address _owner,
-        uint256 _expiry,
-        uint256 _rate,
-        uint256 _dsId,
-        uint8 decimals_
-    ) Asset(prefix, _pairName, _owner, _expiry, _rate, _dsId) {
+    constructor(string memory _pairName, address _owner, uint256 _expiry, uint256 _rate, uint256 _dsId, uint8 decimals_)
+        Asset(_pairName, _owner, _expiry, _rate, _dsId)
+    {
         _decimals = decimals_;
     }
 
@@ -77,8 +71,8 @@ contract TestHelper is Test, Deployers {
 
         poolManager = IPoolManager(manager);
 
-        token0 = new Asset("AA", "ABAB", address(this), expiry(), 0, 1);
-        token1 = new Asset("AA", "ABAB", address(this), expiry(), 0, 1);
+        token0 = new Asset("ABAB", address(this), expiry(), 0, 1);
+        token1 = new Asset("ABAB", address(this), expiry(), 0, 1);
 
         //sort
         if (address(token0) > address(token1)) {
@@ -107,8 +101,8 @@ contract TestHelper is Test, Deployers {
 
         poolManager = IPoolManager(manager);
 
-        token0 = Asset(new CustomAsset("AA", "ABAB", address(this), expiry(), 0, 1, decimals0));
-        token1 = Asset(new CustomAsset("AA", "ABAB", address(this), expiry(), 0, 1, decimals1));
+        token0 = Asset(new CustomAsset("ABAB", address(this), expiry(), 0, 1, decimals0));
+        token1 = Asset(new CustomAsset("ABAB", address(this), expiry(), 0, 1, decimals1));
 
         //sort
         if (address(token0) > address(token1)) {
@@ -132,7 +126,6 @@ contract TestHelper is Test, Deployers {
         vm.prank(owner);
         hook.updateBaseFeePercentage(ra, ct, fee);
     }
-
 
     function updateHookFee(uint256 fee) public {
         updateHookFee(address(token0), address(token1), fee);
