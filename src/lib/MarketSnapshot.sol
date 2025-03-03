@@ -11,6 +11,9 @@ struct MarketSnapshot {
     uint256 oneMinusT;
     uint256 baseFee;
     address liquidityToken;
+    uint256 startTimestamp;
+    uint256 endTimestamp;
+    uint256 treasuryFeePercentage;
 }
 
 library MarketSnapshotLib {
@@ -35,9 +38,9 @@ library MarketSnapshotLib {
         returns (uint256 amountOut)
     {
         if (raForCt) {
-            amountOut = SwapMath.getAmountOut(amountIn, self.reserveRa, self.reserveCt, self.oneMinusT, self.baseFee);
+            (amountOut,) = SwapMath.getAmountOut(amountIn, self.reserveRa, self.reserveCt, self.oneMinusT, self.baseFee);
         } else {
-            amountOut = SwapMath.getAmountOut(amountIn, self.reserveCt, self.reserveRa, self.oneMinusT, self.baseFee);
+            (amountOut,) = SwapMath.getAmountOut(amountIn, self.reserveCt, self.reserveRa, self.oneMinusT, self.baseFee);
         }
     }
 
@@ -47,9 +50,9 @@ library MarketSnapshotLib {
         returns (uint256 amountIn)
     {
         if (raForCt) {
-            amountIn = SwapMath.getAmountIn(amountOut, self.reserveRa, self.reserveCt, self.oneMinusT, self.baseFee);
+            (amountIn,) = SwapMath.getAmountIn(amountOut, self.reserveRa, self.reserveCt, self.oneMinusT, self.baseFee);
         } else {
-            amountIn = SwapMath.getAmountIn(amountOut, self.reserveCt, self.reserveRa, self.oneMinusT, self.baseFee);
+            (amountIn,) = SwapMath.getAmountIn(amountOut, self.reserveCt, self.reserveRa, self.oneMinusT, self.baseFee);
         }
     }
 

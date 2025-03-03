@@ -130,6 +130,9 @@ struct PoolState {
     uint256 fee;
     uint256 startTimestamp;
     uint256 endTimestamp;
+    // treasury split percentage in 18 decimals, 1% is 1e18
+    // an amoount equal to treasurySplitPercentage * fee will be sent to the treasury
+    uint256 treasurySplitPercentage;
 }
 
 library PoolStateLibrary {

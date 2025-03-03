@@ -20,7 +20,7 @@ contract SwapMathTest is Test {
 
         vm.assertEq(_1MinT, 0.1 ether);
 
-        uint256 _in = SwapMath.getAmountIn(yOut, xReserve, yReserve, _1MinT, 0);
+        (uint256 _in,) = SwapMath.getAmountIn(yOut, xReserve, yReserve, _1MinT, 0);
 
         vm.assertApproxEqAbs(_in, xIn, 0.00001 ether);
     }
@@ -36,9 +36,10 @@ contract SwapMathTest is Test {
         //  1% fee
         uint256 fee = 1 ether;
 
-        uint256 _in = SwapMath.getAmountIn(yOut, xReserve, yReserve, _1MinT, fee);
+        (uint256 _in, uint256 _fee) = SwapMath.getAmountIn(yOut, xReserve, yReserve, _1MinT, fee);
 
         vm.assertApproxEqAbs(_in, xIn + 0.009 ether, 0.001 ether);
+        vm.assertApproxEqAbs(_fee, 0.009 ether, 0.001 ether);
     }
 
     function test_amountOutWithoutFee() external pure {
@@ -49,7 +50,7 @@ contract SwapMathTest is Test {
 
         vm.assertEq(_1MinT, 0.1 ether);
 
-        uint256 _out = SwapMath.getAmountOut(xIn, xReserve, yReserve, _1MinT, 0);
+        (uint256 _out,) = SwapMath.getAmountOut(xIn, xReserve, yReserve, _1MinT, 0);
 
         vm.assertApproxEqAbs(_out, yOut, 0.00001 ether);
     }
@@ -65,9 +66,10 @@ contract SwapMathTest is Test {
         //  1% fee
         uint256 fee = 1 ether;
 
-        uint256 _out = SwapMath.getAmountOut(xIn, xReserve, yReserve, _1MinT, fee);
+        (uint256 _out, uint256 _fee) = SwapMath.getAmountOut(xIn, xReserve, yReserve, _1MinT, fee);
 
         vm.assertApproxEqAbs(_out, yOut - 0.009 ether, 0.001 ether);
+        vm.assertApproxEqAbs(_fee, 0.009 ether, 0.001 ether);
     }
 
     function test_inOutParity() external {
@@ -78,13 +80,13 @@ contract SwapMathTest is Test {
 
         vm.assertEq(_1MinT, 0.1 ether);
 
-        uint256 initOut = SwapMath.getAmountOut(xIn, xReserve, yReserve, _1MinT, 0);
-        uint256 initIn = SwapMath.getAmountIn(initOut, xReserve, yReserve, _1MinT, 0);
+        (uint256 initOut,) = SwapMath.getAmountOut(xIn, xReserve, yReserve, _1MinT, 0);
+        (uint256 initIn,) = SwapMath.getAmountIn(initOut, xReserve, yReserve, _1MinT, 0);
 
-        uint256 out = SwapMath.getAmountOut(initIn, xReserve, yReserve, _1MinT, 0);
+        (uint256 out,) = SwapMath.getAmountOut(initIn, xReserve, yReserve, _1MinT, 0);
         vm.assertApproxEqAbs(initOut, out, 0.000000001 ether);
 
-        uint256 in_ = SwapMath.getAmountIn(initOut, xReserve, yReserve, _1MinT, 0);
+        (uint256 in_,) = SwapMath.getAmountIn(initOut, xReserve, yReserve, _1MinT, 0);
         vm.assertApproxEqAbs(initIn, in_, 0.000000001 ether);
     }
 

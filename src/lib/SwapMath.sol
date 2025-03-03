@@ -7,23 +7,28 @@ library SwapMath {
     uint256 internal constant MINIMUM_ELAPSED = 1;
 
     /// @notice amountOut = reserveOut - (k - (reserveIn + amountIn)^(1-t))^1/(1-t)
+    /// the fee here is taken from the input token and generally doesn't need to be exposed to the user
     function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut, uint256 _1MinT, uint256 baseFee)
         internal
         pure
-        returns (uint256 amountOut)
+        returns (uint256 amountOut, uint256 fee)
     {
-        amountOut = unwrap(_getAmountOut(ud(amountIn), ud(reserveIn), ud(reserveOut), ud(_1MinT), ud(baseFee)));
+        (UD60x18 amountOutRaw, UD60x18 feeRaw) =
+            _getAmountOut(ud(amountIn), ud(reserveIn), ud(reserveOut), ud(_1MinT), ud(baseFee));
+
+        amountOut = unwrap(amountOutRaw);
+        fee = unwrap(feeRaw);
     }
 
     function _getAmountOut(UD60x18 amountIn, UD60x18 reserveIn, UD60x18 reserveOut, UD60x18 _1MinT, UD60x18 baseFee)
         internal
         pure
-        returns (UD60x18 amountOut)
+        returns (UD60x18 amountOut, UD60x18 fee)
     {
         // Calculate fee factor = baseFee x t in percentage, we complement _1MinT to get t
         // the end result should be total fee that we must take out
         UD60x18 feeFactor = mul(baseFee, sub(convert(1), _1MinT));
-        UD60x18 fee = _calculatePercentage(amountIn, feeFactor);
+        fee = _calculatePercentage(amountIn, feeFactor);
 
         // Calculate amountIn after fee = amountIn * feeFactor
         amountIn = sub(amountIn, fee);
@@ -43,18 +48,24 @@ library SwapMath {
     }
 
     /// @notice amountIn = (k - (reserveOut - amountOut)^(1-t))^1/(1-t) - reserveIn
+    /// the fee here is taken from the input token is already included in amountIn
+    /// the fee is generally doesn't need to be exposed to the user since internally it's only used for splitting fees between LPs and the protocol
     function getAmountIn(uint256 amountOut, uint256 reserveIn, uint256 reserveOut, uint256 _1MinT, uint256 baseFee)
         internal
         pure
-        returns (uint256 amountIn)
+        returns (uint256 amountIn, uint256 fee)
     {
-        amountIn = unwrap(_getAmountIn(ud(amountOut), ud(reserveIn), ud(reserveOut), ud(_1MinT), ud(baseFee)));
+        (UD60x18 amountInRaw, UD60x18 feeRaw) =
+            _getAmountIn(ud(amountOut), ud(reserveIn), ud(reserveOut), ud(_1MinT), ud(baseFee));
+
+        amountIn = unwrap(amountInRaw);
+        fee = unwrap(feeRaw);
     }
 
     function _getAmountIn(UD60x18 amountOut, UD60x18 reserveIn, UD60x18 reserveOut, UD60x18 _1MinT, UD60x18 baseFee)
         internal
         pure
-        returns (UD60x18 amountIn)
+        returns (UD60x18 amountIn, UD60x18 fee)
     {
         UD60x18 reserveInExp = pow(reserveIn, _1MinT);
 
@@ -73,7 +84,13 @@ library SwapMath {
         UD60x18 feeFactor = div(mul(baseFee, sub(convert(1), _1MinT)), convert(100));
         feeFactor = sub(convert(1), feeFactor);
 
-        amountIn = div(amountIn, feeFactor);
+        UD60x18 adjustedAmountIn = div(amountIn, feeFactor);
+
+        fee = sub(adjustedAmountIn, amountIn);
+
+        assert(add(amountIn, fee) == adjustedAmountIn);
+
+        amountIn = adjustedAmountIn;
     }
 
     function getNormalizedTimeToMaturity(uint256 startTime, uint256 maturityTime, uint256 currentTime)

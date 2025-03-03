@@ -87,7 +87,47 @@ contract SwapTest is TestHelper {
         vm.assertApproxEqAbs(balanceBeforeToken0 - balanceAfterToken0, xIn, 0.00001 ether);
     }
 
-    /// forge-config: default.fuzz.show-logs = true
+    function test_exactInSwapFromCoreWithFee() public {
+        uint256 feePercentage = 1 ether;
+        updateHookFee(feePercentage);
+
+        uint256 splitPercentage = 10 ether;
+        updateTreasurySplitPercentage(splitPercentage);
+
+        token0.mint(DEFAULT_ADDRESS, type(uint240).max);
+        token1.mint(DEFAULT_ADDRESS, type(uint240).max);
+
+        vm.startPrank(DEFAULT_ADDRESS);
+
+        // approve the router to spend
+        token0.approve(address(swapRouter), type(uint240).max);
+        token1.approve(address(swapRouter), type(uint240).max);
+
+        uint256 balanceBeforeToken1 = token1.balanceOf(DEFAULT_ADDRESS);
+        uint256 balanceBeforeToken0 = token0.balanceOf(DEFAULT_ADDRESS);
+
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams(true, -int256(xIn), Constants.SQRT_PRICE_1_1);
+
+        swapRouter.swap(
+            hook.getPoolKey(address(token0), address(token1)),
+            params,
+            PoolSwapTest.TestSettings(false, false),
+            bytes("")
+        );
+
+        uint256 balanceAfterToken1 = token1.balanceOf(DEFAULT_ADDRESS);
+        uint256 balanceAfterToken0 = token0.balanceOf(DEFAULT_ADDRESS);
+
+        vm.stopPrank();
+
+        vm.assertApproxEqAbs(balanceAfterToken1 - balanceBeforeToken1, yOut, 0.01 ether);
+        vm.assertApproxEqAbs(balanceBeforeToken0 - balanceAfterToken0, xIn, 0.01 ether);
+
+        uint256 treasuryBalance = token0.balanceOf(DEFAULT_TREASURY);
+
+        vm.assertApproxEqAbs(treasuryBalance, 0.0009 ether, 0.0001 ether);
+    }
+
     function testFuzz_exactInSwapFromCore(uint8 decimals0, uint8 decimals1) public {
         setupDifferentDecimals(decimals0, decimals1);
 
@@ -145,6 +185,39 @@ contract SwapTest is TestHelper {
 
         vm.assertEq(balanceAfterToken1 - balanceBeforeToken1, yOut);
         vm.assertApproxEqAbs(balanceBeforeToken0 - balanceAfterToken0, xIn, 0.00001 ether);
+    }
+
+    function test_exactOutSwapFromHookWithFee() public {
+        uint256 feePercentage = 1 ether;
+        updateHookFee(feePercentage);
+
+        uint256 splitPercentage = 10 ether;
+        updateTreasurySplitPercentage(splitPercentage);
+
+        token0.mint(DEFAULT_ADDRESS, type(uint240).max);
+        token1.mint(DEFAULT_ADDRESS, type(uint240).max);
+
+        vm.startPrank(DEFAULT_ADDRESS);
+
+        token0.approve(address(hook), type(uint240).max);
+        token1.approve(address(hook), type(uint240).max);
+
+        uint256 balanceBeforeToken1 = token1.balanceOf(DEFAULT_ADDRESS);
+        uint256 balanceBeforeToken0 = token0.balanceOf(DEFAULT_ADDRESS);
+
+        hook.swap(address(token0), address(token1), 0, yOut, bytes(""));
+
+        uint256 balanceAfterToken1 = token1.balanceOf(DEFAULT_ADDRESS);
+        uint256 balanceAfterToken0 = token0.balanceOf(DEFAULT_ADDRESS);
+
+        vm.stopPrank();
+
+        vm.assertEq(balanceAfterToken1 - balanceBeforeToken1, yOut);
+        vm.assertApproxEqAbs(balanceBeforeToken0 - balanceAfterToken0, xIn, 0.1 ether);
+
+        uint256 treasuryBalance = token0.balanceOf(DEFAULT_TREASURY);
+
+        vm.assertApproxEqAbs(treasuryBalance, 0.0009 ether, 0.0001 ether);
     }
 
     function testFuzz_exactOutSwapFromHook(uint8 decimals0, uint8 decimals1) public {
