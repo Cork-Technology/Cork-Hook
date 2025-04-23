@@ -2,7 +2,7 @@ pragma solidity ^0.8.0;
 
 import "./../../Helper.sol";
 import {PoolState} from "./../../../src/CorkHook.sol";
-import "Depeg-swap/contracts/libraries/TransferHelper.sol";
+import "../../../src/lib/TransferHelper.sol";
 
 contract RemoveLiquidityTest is TestHelper {
     function setUp() external {

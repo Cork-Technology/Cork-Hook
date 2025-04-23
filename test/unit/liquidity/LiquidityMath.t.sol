@@ -80,8 +80,8 @@ contract LiquidityMathTest is Test {
 
         uint256 liquidityAmount = 0;
 
-        vm.expectRevert();
-        LiquidityMath.removeLiquidity(reserve0, reserve1, totalLiquidity, liquidityAmount);
+        vm.expectRevert(IErrors.InvalidAmount.selector);
+        this.callRemoveLiquidity(reserve0, reserve1, totalLiquidity, liquidityAmount);
     }
 
     function testRevert_removeLiquidityNoLiquidity() external {
@@ -91,8 +91,8 @@ contract LiquidityMathTest is Test {
 
         uint256 liquidityAmount = 100 ether;
 
-        vm.expectRevert();
-        LiquidityMath.removeLiquidity(reserve0, reserve1, totalLiquidity, liquidityAmount);
+        vm.expectRevert(IErrors.NotEnoughLiquidity.selector);
+        this.callRemoveLiquidity(reserve0, reserve1, totalLiquidity, liquidityAmount);
     }
 
     function testFuzz_proportionalAmount(uint256 amount0) external {
@@ -127,5 +127,12 @@ contract LiquidityMathTest is Test {
         // we only use 0.25 ether
         vm.assertEq(amount0, 0.25 ether);
         vm.assertEq(amount1, amount1Desired);
+    }
+
+    // Helper function that creates proper call depth for expectRevert to work
+    function callRemoveLiquidity(uint256 reserve0, uint256 reserve1, uint256 totalLiquidity, uint256 liquidityAmount)
+        external
+    {
+        LiquidityMath.removeLiquidity(reserve0, reserve1, totalLiquidity, liquidityAmount);
     }
 }

@@ -7,7 +7,7 @@ import {IErrors} from "./../interfaces/IErrors.sol";
 import {Currency} from "v4-periphery/lib/v4-core/src/types/Currency.sol";
 import {CurrencySettler} from "v4-periphery/lib/v4-core/test/utils/CurrencySettler.sol";
 import {IPoolManager} from "v4-periphery/lib/v4-core/src/interfaces/IPoolManager.sol";
-import {TransferHelper} from "Depeg-swap/contracts/libraries/TransferHelper.sol";
+import {TransferHelper} from "./TransferHelper.sol";
 
 /// @notice amm id,
 type AmmId is bytes32;

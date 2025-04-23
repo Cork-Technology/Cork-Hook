@@ -13,7 +13,7 @@ import {CurrencySettler} from "v4-periphery/lib/v4-core/test/utils/CurrencySettl
 import {LiquidityToken} from "./LiquidityToken.sol";
 import {Action, AddLiquidtyParams, RemoveLiquidtyParams} from "./lib/Calls.sol";
 import {SwapMath} from "./lib/SwapMath.sol";
-import {IExpiry} from "Depeg-swap/contracts/interfaces/IExpiry.sol";
+import {IExpiry} from "./interfaces/IExpiry.sol";
 import {CorkSwapCallback} from "./interfaces/CorkSwapCallback.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {HookForwarder} from "./Forwarder.sol";

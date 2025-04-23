@@ -11,28 +11,8 @@ import {Deployers} from "v4-periphery/lib/v4-core/test/utils/Deployers.sol";
 import "v4-periphery/lib/v4-core/src/types/PoolKey.sol";
 import {CorkHook, LiquidityToken, AmmId, PoolState} from "./../src/CorkHook.sol";
 import {TestCorkHook} from "./TestCorkHook.sol";
-import "Depeg-swap/contracts/core/assets/Asset.sol";
 import "forge-std/console.sol";
-
-contract CustomAsset is Asset {
-    uint8 _decimals;
-
-    constructor(
-        string memory prefix,
-        string memory _pairName,
-        address _owner,
-        uint256 _expiry,
-        uint256 _rate,
-        uint256 _dsId,
-        uint8 decimals_
-    ) Asset(prefix, _pairName, _owner, _expiry, _rate, _dsId) {
-        _decimals = decimals_;
-    }
-
-    function decimals() public view override returns (uint8) {
-        return _decimals;
-    }
-}
+import {DummyErc20} from "./../script/DeployLocal.s.sol";
 
 contract MockTreasuryResgistry {
     address public treasury;
@@ -45,16 +25,20 @@ contract MockTreasuryResgistry {
 contract TestHelper is Test, Deployers {
     IPoolManager poolManager;
 
-    Asset token0;
-    Asset token1;
+    DummyErc20 token0;
+    DummyErc20 token1;
 
     LiquidityToken lpBase;
     TestCorkHook hook;
 
-    uint160 flags = uint160(
-        Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
-            | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
-    );
+    uint160 flags =
+        uint160(
+            Hooks.BEFORE_INITIALIZE_FLAG |
+                Hooks.BEFORE_ADD_LIQUIDITY_FLAG |
+                Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG |
+                Hooks.BEFORE_SWAP_FLAG |
+                Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
+        );
 
     address DEFAULT_ADDRESS = address(69);
     uint8 DEFAULT_DECIMALS = 18;
@@ -77,8 +61,8 @@ contract TestHelper is Test, Deployers {
 
         poolManager = IPoolManager(manager);
 
-        token0 = new Asset("AA", "ABAB", address(this), expiry(), 0, 1);
-        token1 = new Asset("AA", "ABAB", address(this), expiry(), 0, 1);
+        token0 = new DummyErc20(18,expiry());
+        token1 = new DummyErc20(18,expiry());
 
         //sort
         if (address(token0) > address(token1)) {
@@ -87,7 +71,11 @@ contract TestHelper is Test, Deployers {
 
         lpBase = new LiquidityToken();
 
-        deployCodeTo("TestCorkHook.sol", abi.encode(poolManager, lpBase, DEFAULT_HOOK_OWNER), address(flags));
+        deployCodeTo(
+            "TestCorkHook.sol",
+            abi.encode(poolManager, lpBase, DEFAULT_HOOK_OWNER),
+            address(flags)
+        );
 
         hook = TestCorkHook(address(flags));
     }
@@ -102,13 +90,16 @@ contract TestHelper is Test, Deployers {
         MockTreasuryResgistry(hookOwner).setTreasury(defaultTreasury());
     }
 
-    function setupTestWithDifferentDecimals(uint8 decimals0, uint8 decimals1) public {
+    function setupTestWithDifferentDecimals(
+        uint8 decimals0,
+        uint8 decimals1
+    ) public {
         deployFreshManagerAndRouters();
 
         poolManager = IPoolManager(manager);
 
-        token0 = Asset(new CustomAsset("AA", "ABAB", address(this), expiry(), 0, 1, decimals0));
-        token1 = Asset(new CustomAsset("AA", "ABAB", address(this), expiry(), 0, 1, decimals1));
+        token0 = new DummyErc20(decimals0,expiry());
+        token1 = new DummyErc20(decimals1,expiry());
 
         //sort
         if (address(token0) > address(token1)) {
@@ -117,7 +108,11 @@ contract TestHelper is Test, Deployers {
 
         lpBase = new LiquidityToken();
 
-        deployCodeTo("TestCorkHook.sol", abi.encode(poolManager, lpBase, DEFAULT_HOOK_OWNER), address(flags));
+        deployCodeTo(
+            "TestCorkHook.sol",
+            abi.encode(poolManager, lpBase, DEFAULT_HOOK_OWNER),
+            address(flags)
+        );
 
         hook = TestCorkHook(address(flags));
     }
@@ -133,12 +128,15 @@ contract TestHelper is Test, Deployers {
         hook.updateBaseFeePercentage(ra, ct, fee);
     }
 
-
     function updateHookFee(uint256 fee) public {
         updateHookFee(address(token0), address(token1), fee);
     }
 
-    function updateTreasurySplitPercentage(address ra, address ct, uint256 split) public {
+    function updateTreasurySplitPercentage(
+        address ra,
+        address ct,
+        uint256 split
+    ) public {
         address owner = hook.owner();
         vm.prank(owner);
         hook.updateTreasurySplitPercentage(ra, ct, split);
@@ -149,7 +147,13 @@ contract TestHelper is Test, Deployers {
     }
 
     function withInitializedPool() public {
-        PoolKey memory key = PoolKey(Currency.wrap(address(token0)), Currency.wrap(address(token1)), 0, 1, IHooks(hook));
+        PoolKey memory key = PoolKey(
+            Currency.wrap(address(token0)),
+            Currency.wrap(address(token1)),
+            0,
+            1,
+            IHooks(hook)
+        );
 
         poolManager.initialize(key, SQRT_PRICE_1_1);
         _setupMockTreasuryRegistry();
@@ -163,7 +167,15 @@ contract TestHelper is Test, Deployers {
         token0.approve(address(hook), amount0);
         token1.approve(address(hook), amount1);
 
-        hook.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0, block.timestamp);
+        hook.addLiquidity(
+            address(token0),
+            address(token1),
+            amount0,
+            amount1,
+            0,
+            0,
+            block.timestamp
+        );
         vm.stopPrank();
     }
 }
