@@ -5,7 +5,7 @@ import "./../../../src/Constants.sol";
 import "./../../../src/interfaces/CorkSwapCallback.sol";
 import "v4-periphery/lib/v4-core/src/test/PoolSwapTest.sol";
 import "./../../../src/lib/MarketSnapshot.sol";
-import "Depeg-swap/contracts/libraries/TransferHelper.sol";
+import "../../../src/lib/TransferHelper.sol";
 
 contract SwapTest is TestHelper {
     uint256 internal xReserve = 1000 ether;
@@ -508,6 +508,6 @@ contract FlashSwapTest is CorkSwapCallback {
         }
 
         // to test, we just unconditionally pay the pool manager
-        Asset(paymentToken).transfer(_poolManager, paymentAmount);
+        DummyErc20(paymentToken).transfer(_poolManager, paymentAmount);
     }
 }

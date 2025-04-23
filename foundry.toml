@@ -7,3 +7,4 @@ optimizer = true
 optimizer_runs = 1_000_000
 fs_permissions = [{ access = "read-write", path = ".forge-snapshots/" }]
 evm_version = "cancun"
+solc = "0.8.26"
