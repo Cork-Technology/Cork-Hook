@@ -64,7 +64,7 @@ library MarketSnapshotLib {
         address tokenOut = raForCt ? self.ct : self.ra;
         amountOut = TransferHelper.tokenNativeDecimalsToFixed(amountOut, tokenOut);
 
-        amountOut = getAmountInNoConvert(self, amountOut, raForCt);
+        amountIn = getAmountInNoConvert(self, amountOut, raForCt);
 
         address tokenIn = raForCt ? self.ra : self.ct;
         amountIn = TransferHelper.fixedToTokenNativeDecimals(amountIn, tokenIn);
